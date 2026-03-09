@@ -18,4 +18,4 @@ RUN uv sync --no-dev --no-editable --extra browse --extra file --extra korean --
 COPY koclaw/ ./koclaw/
 COPY main.py ./
 
-CMD ["uv", "run", "python", "main.py"]
+CMD ["/app/.venv/bin/python", "main.py"]

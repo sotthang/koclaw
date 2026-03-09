@@ -10,6 +10,9 @@ services:
 
   koclaw:
     build: .
+    user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
+    group_add:
+      - "${DOCKER_GID:-999}"
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1

@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+# 샌드박스에서 필요한 최소 패키지만 설치
+RUN pip install pypdf pyhwp python-hwpx six python-docx --no-cache-dir
+
+# 비루트 사용자로 실행
+RUN useradd -m -u 1000 sandbox
+
+# runner 스크립트 복사
+COPY koclaw/sandbox_runner.py /app/sandbox_runner.py
+
+# /workspace 만 마운트 허용 (docker run 시 volume으로 전달됨)
+VOLUME ["/workspace"]
+
+WORKDIR /workspace
+
+USER sandbox
+
+ENTRYPOINT ["python", "/app/sandbox_runner.py"]

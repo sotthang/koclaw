@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from koclaw.core.tool import Tool
 from koclaw.storage.db import Database
 
-
 _MAX_TITLE_LENGTH = 200
 
 

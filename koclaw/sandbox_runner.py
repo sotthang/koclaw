@@ -12,10 +12,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from pypdf import PdfReader
+
 _CODE_TIMEOUT_SEC = 10.0
 _MAX_OUTPUT_BYTES = 10 * 1024  # 10KB
-
-from pypdf import PdfReader
 
 WORKSPACE = Path("/workspace")
 PARENT_WORKSPACE: Path | None = (

@@ -1,8 +1,6 @@
 """execute_code tool 단위 테스트"""
-import pytest
 
 from koclaw.tools.execute_code import ExecuteCodeTool
-
 
 # ── Tool 스키마 ───────────────────────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from koclaw.channels.discord import DiscordChannel, _discord_file_fetcher, parse_discord_message

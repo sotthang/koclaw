@@ -1,8 +1,6 @@
 """SchedulerTool 단위 테스트."""
 from unittest.mock import AsyncMock
 
-import pytest
-
 from koclaw.tools.scheduler import SchedulerTool
 
 MAX_TITLE_LENGTH = 200

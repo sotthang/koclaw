@@ -66,8 +66,9 @@ SESSION_ID_PREFIX = "discord:"
 
 async def _discord_file_fetcher(url: str) -> bytes:
     """Discord 첨부파일 URL에서 바이트를 다운로드한다. 내부 네트워크 URL은 차단한다."""
-    from koclaw.tools.browse import _is_safe_url
     import httpx
+
+    from koclaw.tools.browse import _is_safe_url
 
     if not _is_safe_url(url):
         raise ValueError("이 URL에서 파일을 다운로드할 수 없습니다 (허용되지 않는 URL)")

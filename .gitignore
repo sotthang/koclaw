@@ -27,10 +27,10 @@ storage/workspace/*
 *.swp
 *.swo
 
-# Claude Code (개인 설정만 제외, commands/는 공유)
+# Claude Code (개인 설정만 제외, skills/와 *.md는 공유)
 .claude/settings.local.json
 .claude/settings.json
-.claude/*.md
+.claude/memory/
 
 # OS
 .DS_Store

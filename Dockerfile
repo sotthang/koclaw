@@ -12,7 +12,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # 의존성 먼저 복사 (캐시 활용)
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --no-editable --extra browse --extra file --extra korean --extra discord
+RUN uv sync --no-dev --no-editable --extra all
 
 # 소스 복사
 COPY koclaw/ ./koclaw/

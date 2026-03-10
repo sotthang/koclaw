@@ -21,6 +21,8 @@ HELP_TEXT = """\
 • **파일 분석** — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
 • **코드 실행** — Python 코드를 안전한 샌드박스에서 실행하고 결과 반환
   - `파이썬으로 피보나치 수열 출력해줘`
+• **이메일 전송** — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
+  - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
 
 **스케줄러**
 • 자연어로 알림을 예약할 수 있습니다
@@ -52,6 +54,7 @@ _TOOL_ICONS: dict[str, str] = {
     "youtube": "🎬",
     "code": "💻",
     "memory": "🧠",
+    "send_email": "📧",
     "scheduler": "📅",
     "file": "📄",
 }
@@ -60,6 +63,7 @@ _TOOL_ICONS: dict[str, str] = {
 def _tool_status_text(tool_name: str) -> str:
     icon = _TOOL_ICONS.get(tool_name, "🔧")
     return f"{icon} `{tool_name}` 실행 중..."
+
 
 SESSION_ID_PREFIX = "discord:"
 
@@ -85,10 +89,7 @@ def parse_discord_message(message, bot_user_id: int) -> dict:
         text = text.replace(f"<@{user.id}>", "").replace(f"<@!{user.id}>", "")
     text = text.strip()
 
-    files = [
-        {"name": a.filename, "url": str(a.url)}
-        for a in message.attachments
-    ]
+    files = [{"name": a.filename, "url": str(a.url)} for a in message.attachments]
 
     if message.guild is None:
         session_id = f"discord:dm:{message.author.id}"
@@ -120,8 +121,12 @@ class DiscordChannel:
         return True
 
     async def handle_reaction_added(self, payload, client, bot_user_id: int) -> None:
-        logger.info("[discord] reaction: emoji=%r channel=%s msg=%s",
-                    payload.emoji.name, payload.channel_id, payload.message_id)
+        logger.info(
+            "[discord] reaction: emoji=%r channel=%s msg=%s",
+            payload.emoji.name,
+            payload.channel_id,
+            payload.message_id,
+        )
         if payload.emoji.name != "❌":
             return
         channel = client.get_channel(payload.channel_id)

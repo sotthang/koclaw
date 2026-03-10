@@ -14,6 +14,7 @@ from koclaw.core.scheduler_loop import SchedulerLoop
 from koclaw.core.tool import ToolRegistry
 from koclaw.storage.db import Database
 from koclaw.tools.browse import BrowseTool
+from koclaw.tools.email import EmailTool
 from koclaw.tools.execute_code import ExecuteCodeTool
 from koclaw.tools.rss import RssFeedTool
 from koclaw.tools.search import SearchTool
@@ -44,6 +45,7 @@ async def main():
     tools.register(YouTubeTool())
     tools.register(RssFeedTool())
     tools.register(ExecuteCodeTool())
+    tools.register(EmailTool())
     tools.load_installed()
 
     sandbox = None
@@ -63,9 +65,13 @@ async def main():
 
     if env.get("SLACK_BOT_TOKEN") and env.get("SLACK_APP_TOKEN"):
         from koclaw.channels import slack
+
         runners.append(
             slack.start(
-                env, provider, tools, db,
+                env,
+                provider,
+                tools,
+                db,
                 sandbox=sandbox,
                 workspace=WORKSPACE_DIR,
                 notify_registry=notify_registry,
@@ -79,9 +85,13 @@ async def main():
             import discord  # noqa: F401
 
             from koclaw.channels import discord as discord_ch
+
             runners.append(
                 discord_ch.start(
-                    env, provider, tools, db,
+                    env,
+                    provider,
+                    tools,
+                    db,
                     sandbox=sandbox,
                     workspace=WORKSPACE_DIR,
                     notify_registry=notify_registry,
@@ -90,7 +100,9 @@ async def main():
             )
             logger.info("Discord 채널 활성화")
         except ImportError:
-            logger.warning("⚠️  Discord 채널 비활성화: discord.py 미설치 (pip install 'koclaw[discord]')")
+            logger.warning(
+                "⚠️  Discord 채널 비활성화: discord.py 미설치 (pip install 'koclaw[discord]')"
+            )
 
     if not runners:
         raise ValueError(

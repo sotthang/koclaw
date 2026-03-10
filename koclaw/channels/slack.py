@@ -22,6 +22,8 @@ HELP_TEXT = """\
 • *파일 분석* — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
 • *코드 실행* — Python 코드를 안전한 샌드박스에서 실행하고 결과 반환
   - `파이썬으로 피보나치 수열 출력해줘`
+• *이메일 전송* — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
+  - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
 
 *스케줄러*
 • 자연어로 알림을 예약할 수 있습니다
@@ -50,8 +52,7 @@ HELP_TEXT = """\
 def parse_slack_event(event: dict, bot_user_id: str) -> dict:
     text = re.sub(rf"<@{bot_user_id}>", "", event.get("text", "")).strip()
     files = [
-        {"id": f["id"], "name": f["name"], "url": f["url_private"]}
-        for f in event.get("files", [])
+        {"id": f["id"], "name": f["name"], "url": f["url_private"]} for f in event.get("files", [])
     ]
     thread_ts = event.get("thread_ts")
     channel = event["channel"]
@@ -79,6 +80,7 @@ _TOOL_ICONS: dict[str, str] = {
     "youtube": "🎬",
     "code": "💻",
     "memory": "🧠",
+    "send_email": "📧",
     "scheduler": "📅",
     "file": "📄",
 }
@@ -100,9 +102,7 @@ class SlackChannel:
         normalized = text.strip().lower()
         return normalized in {"help", "/help", "도움말", "/도움말"}
 
-    async def handle_mention(
-        self, event: dict, say, client, bot_user_id: str
-    ) -> None:
+    async def handle_mention(self, event: dict, say, client, bot_user_id: str) -> None:
         parsed = parse_slack_event(event, bot_user_id)
         logger.info("[mention] user=%s text=%r", parsed["user_id"], parsed["text"])
 
@@ -188,9 +188,7 @@ class SlackChannel:
             if msg_id:
                 await self._db.update_message_slack_ts(msg_id, ts)
 
-    async def handle_reaction_added(
-        self, event: dict, client, bot_user_id: str
-    ) -> None:
+    async def handle_reaction_added(self, event: dict, client, bot_user_id: str) -> None:
         if event.get("reaction") != "x":
             return
         item = event.get("item", {})

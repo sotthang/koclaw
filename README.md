@@ -40,7 +40,7 @@ Python 3.12 이상이 필요합니다. 패키지 관리는 [uv](https://docs.ast
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 의존성 설치
-uv sync
+uv sync --all-extras
 
 # 실행
 uv run python main.py
@@ -179,6 +179,7 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `youtube` | YouTube 동영상 자막 기반 내용 요약 |
 | `scheduler` | 알림 스케줄 등록/조회/수정/삭제 (단발/반복) |
 | `memory` | 유저/채널/스레드 범위 장기 기억 저장·조회·삭제 |
+| `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
 | 파일 분석 | PDF, DOCX, HWP, 이미지 자동 파싱 (첨부파일 전송 시 자동) |
 | 코드 실행 | Docker 샌드박스 내 안전한 코드 실행 |
 
@@ -279,6 +280,19 @@ class MyTool(Tool):
 ## 기여하기 (Contributing)
 
 기여를 환영합니다! Fork → PR 방식을 사용합니다.
+
+### Claude Code 기반 개발 권장
+
+이 프로젝트는 **[Claude Code](https://claude.ai/claude-code)** 를 개발 도구로 적극 활용합니다.
+
+`.claude/` 디렉토리에 프로젝트 전략 문서가 포함되어 있습니다:
+
+| 파일 | 내용 |
+| --- | --- |
+| `CLAUDE.md` | 아키텍처, 코딩 컨벤션, 기능 추가 체크리스트 |
+| `.claude/github-strategy.md` | 브랜치 전략, PR 규칙, 릴리즈 전략 |
+
+Claude Code를 사용하면 이 문서들이 자동으로 컨텍스트에 로드되어, 프로젝트 컨벤션에 맞는 코드 생성과 PR 작성을 도와줍니다. Claude Code 없이도 기여 가능하지만, 사용을 권장합니다.
 
 ### 로컬 개발 환경 셋업
 

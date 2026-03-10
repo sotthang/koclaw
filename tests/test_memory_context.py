@@ -41,9 +41,7 @@ class TestParseMemoryContext:
         assert ctx.thread_scope is None
 
     def test_discord_thread_yields_channel_and_thread_scope(self):
-        ctx = parse_memory_context(
-            "discord:thread:77", user_id="123", parent_channel_id="42"
-        )
+        ctx = parse_memory_context("discord:thread:77", user_id="123", parent_channel_id="42")
         assert ctx.user_scope is None
         assert ctx.channel_scope == "discord:42"
         assert ctx.thread_scope == "discord:thread:77"

@@ -149,6 +149,11 @@ def _build_system_prompt(
   확인하고, file(action=read, scope=session)로 읽으세요
 - 일반 질문 답변 및 대화
 
+스케줄 실행 규칙:
+- [스케줄 실행]으로 시작하는 메시지는 예약된 작업이 자동 실행된 것입니다
+- 이 경우 scheduler tool로 새 스케줄을 등록하거나 기존 스케줄을 수정하지 마세요
+- 요청된 콘텐츠(용어 설명, 뉴스 요약 등)만 생성하여 응답하세요
+
 당신이 할 수 없는 일:
 - 실시간 주식/코인 시세, 날씨 등 실시간 데이터 (검색은 가능)
 - 개인정보 수집 또는 저장
@@ -173,6 +178,7 @@ _MAX_FILE_DOWNLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 
 async def _load_memory_section(db: Database, session_id: str, user_id: str | None) -> str | None:
     from koclaw.core.memory_context import parse_memory_context
+
     ctx = parse_memory_context(session_id, user_id)
     parts = []
     for scope_type, scope_id in ctx.applicable_scopes():
@@ -192,9 +198,7 @@ async def _summarize_if_needed(db: Database, provider: LLMProvider, session_id: 
     to_summarize = all_messages[:-_KEEP_RECENT_MESSAGES]
     if not to_summarize:
         return
-    conversation = "\n".join(
-        f"{m['role'].upper()}: {m['content']}" for m in to_summarize
-    )
+    conversation = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in to_summarize)
     summary_prompt = f"다음 대화를 간결하게 요약하세요 (핵심 정보 위주):\n\n{conversation}"
     response = await provider.complete(
         messages=[{"role": "user", "content": summary_prompt}],
@@ -216,6 +220,7 @@ def create_agent_fn(
     format_instructions: str = _SLACK_FORMAT_INSTRUCTIONS,
 ) -> AgentFn:
     from koclaw.tools.file import cleanup_instant
+
     parser = FileParser()
 
     async def agent_fn(
@@ -251,9 +256,7 @@ def create_agent_fn(
         agent.messages = []
         if summary:
             agent.messages.append({"role": "assistant", "content": f"[이전 대화 요약]\n{summary}"})
-        agent.messages += [
-            {"role": m["role"], "content": m["content"]} for m in history
-        ]
+        agent.messages += [{"role": m["role"], "content": m["content"]} for m in history]
 
         full_message = user_message
         if files and file_fetcher:
@@ -267,9 +270,12 @@ def create_agent_fn(
                     safe_name = Path(f["name"]).name
                     if len(data) > _MAX_FILE_DOWNLOAD_BYTES:
                         max_mb = _MAX_FILE_DOWNLOAD_BYTES // 1024 // 1024
-                        saved_names.append(f"{safe_name} (오류: 파일이 너무 큽니다, 최대 {max_mb}MB)")
+                        saved_names.append(
+                            f"{safe_name} (오류: 파일이 너무 큽니다, 최대 {max_mb}MB)"
+                        )
                         continue
                     import tempfile
+
                     with tempfile.NamedTemporaryFile(
                         suffix=Path(f["name"]).suffix, delete=False
                     ) as tmp:
@@ -306,7 +312,9 @@ def create_agent_fn(
                     safe_name = Path(f["name"]).name
                     if len(data) > _MAX_FILE_DOWNLOAD_BYTES:
                         max_mb = _MAX_FILE_DOWNLOAD_BYTES // 1024 // 1024
-                        text_contexts.append(f"[{safe_name}: 오류 — 파일이 너무 큽니다, 최대 {max_mb}MB]")
+                        text_contexts.append(
+                            f"[{safe_name}: 오류 — 파일이 너무 큽니다, 최대 {max_mb}MB]"
+                        )
                         continue
                     with tempfile.NamedTemporaryFile(
                         suffix=Path(f["name"]).suffix, delete=False

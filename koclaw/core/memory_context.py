@@ -36,7 +36,7 @@ def parse_memory_context(
       discord:{id}           → channel scope
     """
     if session_id.startswith("slack:"):
-        rest = session_id[len("slack:"):]
+        rest = session_id[len("slack:") :]
         parts = rest.split(":")
         channel = parts[0]
         if channel.startswith("D") or channel.startswith("G"):
@@ -49,7 +49,7 @@ def parse_memory_context(
         return MemoryContext(channel_scope=session_id)
 
     if session_id.startswith("discord:"):
-        rest = session_id[len("discord:"):]
+        rest = session_id[len("discord:") :]
         if rest.startswith("dm:"):
             return MemoryContext(user_scope=user_id)
         if rest.startswith("thread:"):

@@ -44,7 +44,7 @@ class MemoryTool(Tool):
                 return "오류: scope를 지정해주세요 (user/channel/thread)"
             scope_id = self._get_scope_id(scope)
             if scope_id is None:
-                return f"오류: 현재 컨텍스트에서 '{scope}' 범위를 사용할 수 없습니다"
+                return self._scope_unavailable_msg(scope)
             await self._db.save_memory(scope, scope_id, content)
             return "✅ 기억이 저장되었습니다."
 
@@ -53,11 +53,18 @@ class MemoryTool(Tool):
                 return "오류: scope를 지정해주세요 (user/channel/thread)"
             scope_id = self._get_scope_id(scope)
             if scope_id is None:
-                return f"오류: 현재 컨텍스트에서 '{scope}' 범위를 사용할 수 없습니다"
+                return self._scope_unavailable_msg(scope)
             deleted = await self._db.delete_memory(scope, scope_id)
             return "✅ 기억이 삭제되었습니다." if deleted else "삭제할 기억이 없습니다."
 
         return f"알 수 없는 action: {action}"
+
+    def _scope_unavailable_msg(self, scope: str) -> str:
+        _FALLBACK = {
+            "user": "채널/스레드에서는 'user' 범위를 사용할 수 없습니다. 개인 정보는 'channel' 범위로 저장하세요.",
+            "thread": "스레드 외부에서는 'thread' 범위를 사용할 수 없습니다. 'channel' 범위를 사용하세요.",
+        }
+        return f"오류: {_FALLBACK.get(scope, f'현재 컨텍스트에서 {scope!r} 범위를 사용할 수 없습니다')}"
 
     def _get_scope_id(self, scope: str) -> str | None:
         if scope == "user":
@@ -71,7 +78,9 @@ class MemoryTool(Tool):
     async def _read_all(self) -> str:
         parts = []
         for scope_type, scope_id in self._ctx.applicable_scopes():
-            label = {"user": "개인 기억", "channel": "채널 기억", "thread": "스레드 기억"}.get(scope_type, scope_type)
+            label = {"user": "개인 기억", "channel": "채널 기억", "thread": "스레드 기억"}.get(
+                scope_type, scope_type
+            )
             mem = await self._db.get_memory(scope_type, scope_id)
             if mem:
                 parts.append(f"[{label}]\n{mem}")

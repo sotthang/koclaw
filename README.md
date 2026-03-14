@@ -13,7 +13,7 @@
 - **도구 확장** — 웹 검색, YouTube 요약, PDF/문서 분석, GUI 자동화, 스케줄러, 메모리
 - **플러그인 아키텍처** — 커스텀 도구를 플러그인으로 추가 가능
 - **채널 연동** — Slack, Discord 지원
-- **가상 데스크탑** — Docker 기반 가상 환경에서 브라우저 조작, 클릭, 스크린샷 등 Computer Use
+- **가상 데스크탑** — Docker 가상 환경 또는 Windows 네이티브 데스크탑에서 브라우저 조작, 클릭, 스크린샷 등 Computer Use
 - **계층형 메모리** — 유저/채널/스레드 단위 장기 기억 저장, 대화 자동 요약
 
 ## 빠른 시작 (Docker)
@@ -75,6 +75,7 @@ uv run pytest tests/
 | `SLACK_BOT_TOKEN` | Slack 봇 토큰 (`xoxb-...`) | Slack 사용 시 |
 | `SLACK_APP_TOKEN` | Slack 앱 토큰 (`xapp-...`) | Slack 사용 시 |
 | `DISCORD_BOT_TOKEN` | Discord 봇 토큰 | Discord 사용 시 |
+| `WINDOWS_AGENT_URL` | Windows Agent 주소 (예: `http://192.168.1.10:7777`) — 설정 시 실제 Windows 화면 제어 | 선택 |
 
 ## 기본 사용법
 
@@ -123,17 +124,46 @@ PDF, DOCX, HWPX, 이미지를 첨부하면 자동으로 분석합니다.
 
 #### 가상 데스크탑 제어 (Computer Use)
 
-Docker 컨테이너 안의 가상 데스크탑을 AI가 직접 조작합니다. `koclaw-computer-use` 이미지가 빌드되어 있어야 합니다.
+AI가 데스크탑을 직접 조작합니다. **두 가지 모드**를 지원합니다.
 
 ```text
 네이버 열고 AI 뉴스 검색해서 스크린샷 찍어줘
-https://example.com 열고 로그인 버튼 눌러줘
-구글에서 파이썬 튜토리얼 검색하고 첫 번째 결과 열어줘
+슬랙에서 홍길동한테 안녕이라고 보내줘
+크롬 열어서 구글 검색해줘
 ```
 
-지원 액션: `screenshot` (화면 캡처) · `click` (좌표 클릭) · `type` (텍스트 입력) · `key` (키 입력) · `open_url` (URL 열기) · `scroll` (스크롤)
+지원 액션: `screenshot` (화면 캡처) · `click` (좌표 클릭) · `type` (텍스트 입력) · `key` (키 입력) · `open_url` (URL 열기) · `scroll` (스크롤) · `run_command` (셸/PowerShell 명령)
 
-> **참고**: Docker가 설치되어 있어야 합니다. `./start.sh` 실행 시 자동으로 이미지가 빌드됩니다.
+##### 모드 1: Docker 가상 데스크탑 (Linux/OCI)
+
+Docker 컨테이너 안의 가상 화면을 제어합니다. `WINDOWS_AGENT_URL` 미설정 시 자동으로 이 모드를 사용합니다.
+
+> Docker가 설치되어 있어야 합니다. `./start.sh` 실행 시 자동으로 이미지가 빌드됩니다.
+
+##### 모드 2: Windows 네이티브 데스크탑
+
+실제 Windows 화면을 직접 제어합니다. Slack, Excel, 탐색기 등 모든 Windows 앱을 조작할 수 있습니다.
+
+설치 방법:
+
+```powershell
+# Windows에서 실행
+powershell -ExecutionPolicy Bypass -File windows_agent\install.ps1
+```
+
+`.env`에 추가:
+
+```env
+WINDOWS_AGENT_URL=http://<Windows-IP>:7777
+```
+
+실시간 화면 보기 (브라우저):
+
+```text
+http://<Windows-IP>:7777/view
+```
+
+> Tailscale 등 VPN을 사용하면 외부 네트워크에서도 접속할 수 있습니다.
 
 #### 스케줄러
 
@@ -184,7 +214,7 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `scheduler` | 알림 스케줄 등록/조회/수정/삭제 (단발/반복) |
 | `memory` | 유저/채널/스레드 범위 장기 기억 저장·조회·삭제 |
 | `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
-| `computer_use` | 가상 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 필요) |
+| `computer_use` | 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 또는 Windows Agent) |
 | 파일 분석 | PDF, DOCX, HWP, 이미지 자동 파싱 (첨부파일 전송 시 자동) |
 
 ## Ollama (로컬 LLM)
@@ -226,8 +256,9 @@ koclaw/
 │   ├── scheduler_loop.py       # 스케줄 실행 루프
 │   ├── file_parser.py          # 파일 파싱 (PDF/DOCX/HWP)
 │   ├── memory_context.py       # 메모리 스코프 파싱
-│   ├── prompt_guard.py         # 프롬프트 인젝션 방어
-│   └── computer_use_manager.py # 가상 데스크탑 Docker 컨테이너 관리
+│   ├── prompt_guard.py              # 프롬프트 인젝션 방어
+│   ├── computer_use_manager.py      # 가상 데스크탑 Docker 컨테이너 관리
+│   └── windows_computer_use_manager.py # Windows 네이티브 데스크탑 제어
 ├── providers/
 │   ├── claude.py          # Anthropic Claude
 │   ├── openai.py          # OpenAI GPT

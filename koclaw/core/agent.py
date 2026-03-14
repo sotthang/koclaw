@@ -107,6 +107,13 @@ class Agent:
                 "_is_image": is_screenshot,
             }
 
+        # computer_use는 클릭→타이핑→키입력 순서가 중요하므로 순차 실행
+        if any(tc.name == "computer_use" for tc in tool_calls):
+            results = []
+            for tc in tool_calls:
+                results.append(await execute_one(tc))
+            return results
+
         return list(await asyncio.gather(*[execute_one(tc) for tc in tool_calls]))
 
     def _response_to_message(self, response: LLMResponse) -> dict:

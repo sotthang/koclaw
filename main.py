@@ -9,13 +9,13 @@ from dotenv import load_dotenv
 
 from koclaw.app import create_provider
 from koclaw.channels import match_registry
-from koclaw.core.sandbox import SandboxManager
+from koclaw.core.computer_use_manager import ComputerUseManager
 from koclaw.core.scheduler_loop import SchedulerLoop
 from koclaw.core.tool import ToolRegistry
 from koclaw.storage.db import Database
 from koclaw.tools.browse import BrowseTool
+from koclaw.tools.computer_use import ComputerUseTool
 from koclaw.tools.email import EmailTool
-from koclaw.tools.execute_code import ExecuteCodeTool
 from koclaw.tools.rss import RssFeedTool
 from koclaw.tools.search import SearchTool
 from koclaw.tools.youtube import YouTubeTool
@@ -44,20 +44,28 @@ async def main():
     tools.register(BrowseTool())
     tools.register(YouTubeTool())
     tools.register(RssFeedTool())
-    tools.register(ExecuteCodeTool())
     tools.register(EmailTool())
-    tools.load_installed()
 
-    sandbox = None
-    if shutil.which("docker"):
-        host_workspace = env.get("WORKSPACE_HOST_PATH")
-        sandbox = SandboxManager(
-            workspace_root=WORKSPACE_DIR,
-            host_workspace_root=host_workspace,
+    computer_use_manager: ComputerUseManager | WindowsComputerUseManager | None = None
+    windows_agent_url = env.get("WINDOWS_AGENT_URL", "").strip()
+    if windows_agent_url:
+        computer_use_manager = WindowsComputerUseManager(url=windows_agent_url)
+        tools.register(ComputerUseTool(manager=computer_use_manager))
+        logger.info("🖥️  Windows Agent 감지됨 — computer_use 활성화 (%s)", windows_agent_url)
+    elif shutil.which("docker"):
+        host_workspace = Path(os.environ.get("HOST_WORKSPACE_DIR", str(WORKSPACE_DIR)))
+        computer_use_manager = ComputerUseManager(
+            workspace=WORKSPACE_DIR,
+            host_workspace=host_workspace,
+            db=db,
         )
-        logger.info("🐳 Docker 감지됨 — sandbox 격리 활성화")
+        await computer_use_manager.restore_containers()
+        tools.register(ComputerUseTool(manager=computer_use_manager))
+        logger.info("🖥️  Docker 감지됨 — computer_use 활성화")
     else:
-        logger.warning("⚠️  Docker 없음 — sandbox 비활성화 (직접 실행)")
+        logger.warning("⚠️  Docker 없음, WINDOWS_AGENT_URL 미설정 — computer_use 비활성화")
+
+    tools.load_installed()
 
     notify_registry: dict[str, Any] = {}
     agent_registry: dict[str, Any] = {}
@@ -72,10 +80,10 @@ async def main():
                 provider,
                 tools,
                 db,
-                sandbox=sandbox,
                 workspace=WORKSPACE_DIR,
                 notify_registry=notify_registry,
                 agent_registry=agent_registry,
+                computer_use_manager=computer_use_manager,
             )
         )
         logger.info("Slack 채널 활성화")
@@ -92,10 +100,10 @@ async def main():
                     provider,
                     tools,
                     db,
-                    sandbox=sandbox,
                     workspace=WORKSPACE_DIR,
                     notify_registry=notify_registry,
                     agent_registry=agent_registry,
+                    computer_use_manager=computer_use_manager,
                 )
             )
             logger.info("Discord 채널 활성화")
@@ -125,7 +133,12 @@ async def main():
 
     scheduler = SchedulerLoop(db=db, notify_fn=route_notify, agent_fn=route_agent)
     logger.info("🤖 koclaw 시작!")
-    await asyncio.gather(scheduler.start(), *runners)
+    try:
+        await asyncio.gather(scheduler.start(), *runners)
+    finally:
+        if computer_use_manager is not None:
+            logger.info("🖥️  computer_use 컨테이너 정리 중...")
+            await computer_use_manager.stop_all()
 
 
 if __name__ == "__main__":

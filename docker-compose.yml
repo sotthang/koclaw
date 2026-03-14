@@ -1,9 +1,9 @@
 services:
-  sandbox:
+  computer-use:
     build:
       context: .
-      dockerfile: Dockerfile.sandbox
-    image: koclaw-sandbox:latest
+      dockerfile: Dockerfile.computer_use
+    image: koclaw-computer-use:latest
     # 빌드만 하고 실행하지 않음 (koclaw가 docker run으로 직접 띄움)
     profiles:
       - build-only
@@ -17,11 +17,12 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Seoul
-      - WORKSPACE_HOST_PATH=${WORKSPACE_HOST_PATH:-${PWD}/storage/workspace}
+      # Docker 안에서 실행 시 volume mount용 호스트 실제 경로 (기본값: PWD/storage/workspace)
+      - HOST_WORKSPACE_DIR=${PWD}/storage/workspace
     volumes:
       # DB와 workspace는 컨테이너 재시작해도 유지
       - ./storage:/app/storage
-      # 세션 컨테이너 생성을 위해 Docker socket 마운트
+      # computer_use 컨테이너 생성을 위해 Docker socket 마운트
       - /var/run/docker.sock:/var/run/docker.sock
     security_opt:
       - no-new-privileges:true

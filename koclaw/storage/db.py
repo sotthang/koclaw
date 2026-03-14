@@ -46,6 +46,13 @@ class Database:
                 content    TEXT    NOT NULL,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS computer_use_containers (
+                session_id   TEXT PRIMARY KEY,
+                container_id TEXT NOT NULL,
+                vnc_port     INTEGER NOT NULL,
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         """)
         # 마이그레이션
         for migration in [
@@ -112,9 +119,7 @@ class Database:
         await self._conn.commit()
         return True
 
-    async def get_messages(
-        self, session_id: str, limit: int | None = None
-    ) -> list[dict]:
+    async def get_messages(self, session_id: str, limit: int | None = None) -> list[dict]:
         sql = """
             SELECT role, content, created_at
             FROM messages
@@ -138,9 +143,7 @@ class Database:
         await self._conn.commit()
 
     async def get_pending_tasks(self) -> list[dict]:
-        return await self.fetch_all(
-            "SELECT * FROM scheduled_tasks WHERE notified = 0"
-        )
+        return await self.fetch_all("SELECT * FROM scheduled_tasks WHERE notified = 0")
 
     async def get_due_tasks(self) -> list[dict]:
         return await self.fetch_all(
@@ -154,9 +157,7 @@ class Database:
         )
         await self._conn.commit()
 
-    async def update_task_run_at(
-        self, session_id: str, title: str, run_at: str
-    ) -> bool:
+    async def update_task_run_at(self, session_id: str, title: str, run_at: str) -> bool:
         cursor = await self._conn.execute(
             "UPDATE scheduled_tasks SET run_at = ? "
             "WHERE session_id = ? AND title = ? AND notified = 0",
@@ -166,9 +167,7 @@ class Database:
         return cursor.rowcount > 0
 
     async def advance_task_run_at(self, task_id: int, recurrence: str) -> None:
-        rows = await self.fetch_all(
-            "SELECT run_at FROM scheduled_tasks WHERE id = ?", (task_id,)
-        )
+        rows = await self.fetch_all("SELECT run_at FROM scheduled_tasks WHERE id = ?", (task_id,))
         current = datetime.fromisoformat(rows[0]["run_at"])
         if recurrence == "hourly":
             next_run = current + timedelta(hours=1)
@@ -191,8 +190,7 @@ class Database:
 
     async def delete_task(self, session_id: str, title: str) -> bool:
         cursor = await self._conn.execute(
-            "DELETE FROM scheduled_tasks "
-            "WHERE session_id = ? AND title = ?",
+            "DELETE FROM scheduled_tasks WHERE session_id = ? AND title = ?",
             (session_id, title),
         )
         await self._conn.commit()
@@ -252,6 +250,31 @@ class Database:
             (session_id,),
         )
         return rows[0]["cnt"]
+
+    # ── Computer Use Containers ───────────────────────────────────────────────
+
+    async def save_container(self, session_id: str, container_id: str, vnc_port: int) -> None:
+        await self._conn.execute(
+            """INSERT INTO computer_use_containers (session_id, container_id, vnc_port)
+               VALUES (?, ?, ?)
+               ON CONFLICT(session_id) DO UPDATE SET
+                   container_id = excluded.container_id,
+                   vnc_port = excluded.vnc_port,
+                   created_at = CURRENT_TIMESTAMP""",
+            (session_id, container_id, vnc_port),
+        )
+        await self._conn.commit()
+
+    async def get_all_containers(self) -> list[dict]:
+        return await self.fetch_all(
+            "SELECT session_id, container_id, vnc_port FROM computer_use_containers"
+        )
+
+    async def delete_container(self, session_id: str) -> None:
+        await self._conn.execute(
+            "DELETE FROM computer_use_containers WHERE session_id = ?", (session_id,)
+        )
+        await self._conn.commit()
 
     async def delete_old_messages(self, session_id: str, keep_last: int) -> None:
         await self._conn.execute(

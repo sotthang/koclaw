@@ -10,9 +10,7 @@ class ClaudeProvider(LLMProvider):
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
 
-    async def complete(
-        self, messages: list[dict], tools: list[dict] | None = None
-    ) -> LLMResponse:
+    async def complete(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
         system, converted = self._convert_messages(messages)
         kwargs = dict(model=self._model, max_tokens=4096, messages=converted)
         if system:
@@ -35,22 +33,41 @@ class ClaudeProvider(LLMProvider):
                 if msg.get("content"):
                     content.append({"type": "text", "text": msg["content"]})
                 for tc in msg["tool_calls"]:
-                    content.append({
-                        "type": "tool_use",
-                        "id": tc["id"],
-                        "name": tc["name"],
-                        "input": tc["arguments"],
-                    })
+                    content.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc["id"],
+                            "name": tc["name"],
+                            "input": tc["arguments"],
+                        }
+                    )
                 converted.append({"role": "assistant", "content": content})
             elif role == "tool":
-                converted.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": msg["tool_call_id"],
-                        "content": msg["content"],
-                    }],
-                })
+                if msg.get("_is_image"):
+                    tool_content = [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": msg["content"],
+                            },
+                        }
+                    ]
+                else:
+                    tool_content = msg["content"]
+                converted.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": msg["tool_call_id"],
+                                "content": tool_content,
+                            }
+                        ],
+                    }
+                )
             else:
                 content = msg["content"]
                 if isinstance(content, list):
@@ -85,8 +102,6 @@ class ClaudeProvider(LLMProvider):
             if block.type == "text":
                 text = block.text
             elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(id=block.id, name=block.name, arguments=block.input)
-                )
+                tool_calls.append(ToolCall(id=block.id, name=block.name, arguments=block.input))
 
         return LLMResponse(content=text, tool_calls=tool_calls)

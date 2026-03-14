@@ -17,9 +17,7 @@ class OpenAIProvider(LLMProvider):
         self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._model = model
 
-    async def complete(
-        self, messages: list[dict], tools: list[dict] | None = None
-    ) -> LLMResponse:
+    async def complete(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
         kwargs = dict(model=self._model, messages=self._convert_messages(messages))
         if tools:
             kwargs["tools"] = [self._to_openai_tool(t) for t in tools]
@@ -32,27 +30,40 @@ class OpenAIProvider(LLMProvider):
         for msg in messages:
             role = msg["role"]
             if role == "assistant" and "tool_calls" in msg:
-                converted.append({
-                    "role": "assistant",
-                    "content": msg.get("content"),
-                    "tool_calls": [
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {
-                                "name": tc["name"],
-                                "arguments": json.dumps(tc["arguments"], ensure_ascii=False),
-                            },
-                        }
-                        for tc in msg["tool_calls"]
-                    ],
-                })
+                converted.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.get("content"),
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tc["name"],
+                                    "arguments": json.dumps(tc["arguments"], ensure_ascii=False),
+                                },
+                            }
+                            for tc in msg["tool_calls"]
+                        ],
+                    }
+                )
             elif role == "tool":
-                converted.append({
-                    "role": "tool",
-                    "tool_call_id": msg["tool_call_id"],
-                    "content": msg["content"],
-                })
+                if msg.get("_is_image"):
+                    tool_content = [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{msg['content']}"},
+                        }
+                    ]
+                else:
+                    tool_content = msg["content"]
+                converted.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg["tool_call_id"],
+                        "content": tool_content,
+                    }
+                )
             else:
                 content = msg["content"]
                 if isinstance(content, list):

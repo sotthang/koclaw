@@ -10,10 +10,10 @@
 
 - **한국어 우선** — 모든 응답이 기본적으로 한국어로 작성되며, HWP 등 한국 문서 포맷을 지원합니다
 - **멀티 LLM 지원** — Claude, GPT, Gemini, Ollama 중 선택 사용, 자동 폴백 지원
-- **도구 확장** — 웹 검색, YouTube 요약, PDF/문서 분석, 코드 실행, 스케줄러, 메모리
+- **도구 확장** — 웹 검색, YouTube 요약, PDF/문서 분석, GUI 자동화, 스케줄러, 메모리
 - **플러그인 아키텍처** — 커스텀 도구를 플러그인으로 추가 가능
 - **채널 연동** — Slack, Discord 지원
-- **컨테이너 격리** — 코드 실행 시 Docker 샌드박스로 안전하게 처리
+- **가상 데스크탑** — Docker 기반 가상 환경에서 브라우저 조작, 클릭, 스크린샷 등 Computer Use
 - **계층형 메모리** — 유저/채널/스레드 단위 장기 기억 저장, 대화 자동 요약
 
 ## 빠른 시작 (Docker)
@@ -121,15 +121,19 @@ https://youtu.be/... 이 영상 요약해줘
 
 PDF, DOCX, HWPX, 이미지를 첨부하면 자동으로 분석합니다.
 
-#### 코드 실행
+#### 가상 데스크탑 제어 (Computer Use)
 
-Python 코드를 Docker 샌드박스 안에서 실행하고 실제 출력 결과를 반환합니다.
+Docker 컨테이너 안의 가상 데스크탑을 AI가 직접 조작합니다. `koclaw-computer-use` 이미지가 빌드되어 있어야 합니다.
 
 ```text
-파이썬으로 피보나치 수열 출력해줘
+네이버 열고 AI 뉴스 검색해서 스크린샷 찍어줘
+https://example.com 열고 로그인 버튼 눌러줘
+구글에서 파이썬 튜토리얼 검색하고 첫 번째 결과 열어줘
 ```
 
-> **참고**: 인터넷 접근이 차단된 격리 환경에서 실행됩니다. 실행 시간은 최대 10초이며 표준 라이브러리만 기본 사용 가능합니다.
+지원 액션: `screenshot` (화면 캡처) · `click` (좌표 클릭) · `type` (텍스트 입력) · `key` (키 입력) · `open_url` (URL 열기) · `scroll` (스크롤)
+
+> **참고**: Docker가 설치되어 있어야 합니다. `./start.sh` 실행 시 자동으로 이미지가 빌드됩니다.
 
 #### 스케줄러
 
@@ -180,8 +184,8 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `scheduler` | 알림 스케줄 등록/조회/수정/삭제 (단발/반복) |
 | `memory` | 유저/채널/스레드 범위 장기 기억 저장·조회·삭제 |
 | `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
+| `computer_use` | 가상 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 필요) |
 | 파일 분석 | PDF, DOCX, HWP, 이미지 자동 파싱 (첨부파일 전송 시 자동) |
-| 코드 실행 | Docker 샌드박스 내 안전한 코드 실행 |
 
 ## Ollama (로컬 LLM)
 
@@ -216,13 +220,14 @@ DEFAULT_MODEL=llama3
 ```text
 koclaw/
 ├── core/
-│   ├── agent.py           # ReAct 에이전트 루프
-│   ├── llm.py             # LLM 추상화 / 폴백
-│   ├── tool.py            # 도구 기반 클래스 / 레지스트리
-│   ├── scheduler_loop.py  # 스케줄 실행 루프
-│   ├── file_parser.py     # 파일 파싱 (PDF/DOCX/HWP)
-│   ├── memory_context.py  # 메모리 스코프 파싱
-│   └── prompt_guard.py    # 프롬프트 인젝션 방어
+│   ├── agent.py                # ReAct 에이전트 루프
+│   ├── llm.py                  # LLM 추상화 / 폴백
+│   ├── tool.py                 # 도구 기반 클래스 / 레지스트리
+│   ├── scheduler_loop.py       # 스케줄 실행 루프
+│   ├── file_parser.py          # 파일 파싱 (PDF/DOCX/HWP)
+│   ├── memory_context.py       # 메모리 스코프 파싱
+│   ├── prompt_guard.py         # 프롬프트 인젝션 방어
+│   └── computer_use_manager.py # 가상 데스크탑 Docker 컨테이너 관리
 ├── providers/
 │   ├── claude.py          # Anthropic Claude
 │   ├── openai.py          # OpenAI GPT
@@ -235,7 +240,8 @@ koclaw/
 │   ├── youtube.py         # YouTube 요약
 │   ├── scheduler.py       # 스케줄 관리
 │   ├── memory.py          # 장기 기억 (DB 기반)
-│   └── file.py            # 파일 읽기/목록
+│   ├── file.py            # 파일 읽기/목록
+│   └── computer_use.py    # 가상 데스크탑 제어
 ├── channels/
 │   ├── slack.py           # Slack 채널 핸들러
 │   └── discord.py         # Discord 채널 핸들러
@@ -331,7 +337,7 @@ git push origin feature/{기능명}
 
 이 프로젝트는 **폐쇄적인 신뢰 환경(사내 Slack/Discord 등)**을 가정합니다.
 
-구현된 보안 대책: 프롬프트 인젝션 방어, SSRF 차단, Docker 샌드박스 격리, 무한 루프 감지, 파일 크기 제한, SQL 파라미터화.
+구현된 보안 대책: 프롬프트 인젝션 방어, SSRF 차단, 무한 루프 감지, 파일 크기 제한, SQL 파라미터화.
 
 외부 공개 환경에 배포할 경우 추가 보안 조치가 필요합니다. 자세한 위협 모델 및 의도적 생략 항목은 [CLAUDE.md](CLAUDE.md)의 "보안 위협 모델" 섹션을 참고하세요.
 

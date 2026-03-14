@@ -14,9 +14,7 @@ class GeminiProvider(LLMProvider):
         self._client = genai.Client(api_key=api_key)
         self._model = model
 
-    async def complete(
-        self, messages: list[dict], tools: list[dict] | None = None
-    ) -> LLMResponse:
+    async def complete(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
         contents = self._to_gemini_contents(messages)
 
@@ -25,14 +23,16 @@ class GeminiProvider(LLMProvider):
             config_kwargs["system_instruction"] = "\n".join(system_parts)
         if tools:
             config_kwargs["tools"] = [
-                types.Tool(function_declarations=[
-                    types.FunctionDeclaration(
-                        name=t["name"],
-                        description=t["description"],
-                        parameters=t["parameters"],
-                    )
-                    for t in tools
-                ])
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name=t["name"],
+                            description=t["description"],
+                            parameters=t["parameters"],
+                        )
+                        for t in tools
+                    ]
+                )
             ]
 
         response = await self._client.aio.models.generate_content(
@@ -63,12 +63,14 @@ class GeminiProvider(LLMProvider):
                         if p["type"] == "text":
                             parts.append(types.Part(text=p["text"]))
                         elif p["type"] == "image":
-                            parts.append(types.Part(
-                                inline_data=types.Blob(
-                                    data=base64.b64decode(p["data"]),
-                                    mime_type=p["mime_type"],
+                            parts.append(
+                                types.Part(
+                                    inline_data=types.Blob(
+                                        data=base64.b64decode(p["data"]),
+                                        mime_type=p["mime_type"],
+                                    )
                                 )
-                            ))
+                            )
                 else:
                     parts = [types.Part(text=content)]
                 contents.append(types.Content(role="user", parts=parts))
@@ -81,22 +83,37 @@ class GeminiProvider(LLMProvider):
                 if msg.get("content"):
                     parts.append(types.Part(text=msg["content"]))
                 for tc in msg.get("tool_calls", []):
-                    parts.append(types.Part(
-                        function_call=types.FunctionCall(name=tc["name"], args=tc["arguments"])
-                    ))
+                    parts.append(
+                        types.Part(
+                            function_call=types.FunctionCall(name=tc["name"], args=tc["arguments"])
+                        )
+                    )
                 if parts:
                     contents.append(types.Content(role="model", parts=parts))
             elif role == "tool":
                 name = id_to_name.get(msg["tool_call_id"], "unknown")
-                contents.append(types.Content(
-                    role="user",
-                    parts=[types.Part(
+                parts = [
+                    types.Part(
                         function_response=types.FunctionResponse(
                             name=name,
-                            response={"result": msg["content"]},
+                            response={
+                                "result": "이미지를 확인하세요"
+                                if msg.get("_is_image")
+                                else msg["content"]
+                            },
                         )
-                    )],
-                ))
+                    )
+                ]
+                if msg.get("_is_image"):
+                    parts.append(
+                        types.Part(
+                            inline_data=types.Blob(
+                                data=base64.b64decode(msg["content"]),
+                                mime_type="image/png",
+                            )
+                        )
+                    )
+                contents.append(types.Content(role="user", parts=parts))
         return contents
 
     def _parse_response(self, response, raw_content=None) -> LLMResponse:
@@ -108,12 +125,14 @@ class GeminiProvider(LLMProvider):
                 text_parts.append(part.text)
             if part.function_call:
                 fc = part.function_call
-                tool_calls.append(ToolCall(
-                    id=str(uuid.uuid4()),
-                    name=fc.name,
-                    arguments=dict(fc.args),
-                    thought_signature=getattr(fc, "thought_signature", None) or None,
-                ))
+                tool_calls.append(
+                    ToolCall(
+                        id=str(uuid.uuid4()),
+                        name=fc.name,
+                        arguments=dict(fc.args),
+                        thought_signature=getattr(fc, "thought_signature", None) or None,
+                    )
+                )
 
         return LLMResponse(
             content="\n".join(text_parts) or None,

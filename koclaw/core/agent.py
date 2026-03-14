@@ -2,17 +2,13 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
 
 from koclaw.core.llm import LLMProvider, LLMResponse, ToolCall
 from koclaw.core.tool import ToolRegistry
 
-if TYPE_CHECKING:
-    from koclaw.core.sandbox import SandboxManager
-
 logger = logging.getLogger(__name__)
 MAX_TURNS_DEFAULT = 20
-_MAX_SAME_TOOL_CALLS = 3
+_MAX_SAME_TOOL_CALLS = 5
 
 
 class Agent:
@@ -22,18 +18,14 @@ class Agent:
         tools: ToolRegistry,
         max_turns: int = MAX_TURNS_DEFAULT,
         system_prompt: str | None = None,
-        sandbox: "SandboxManager | None" = None,
         session_id: str | None = None,
-        parent_session_id: str | None = None,
         on_tool_start: Callable[[str], Awaitable[None]] | None = None,
     ):
         self._provider = provider
         self._tools = tools
         self._max_turns = max_turns
         self._system_prompt = system_prompt
-        self._sandbox = sandbox
         self._session_id = session_id
-        self._parent_session_id = parent_session_id
         self._on_tool_start = on_tool_start
         self.messages: list[dict] = []
 
@@ -58,6 +50,9 @@ class Agent:
 
             # 동일 tool+args 반복 호출 감지 (무한루프 방어)
             for tc in response.tool_calls:
+                # screenshot은 상태 확인용으로 반복 호출이 자연스러우므로 제외
+                if tc.name == "computer_use" and tc.arguments.get("action") == "screenshot":
+                    continue
                 key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)}"
                 tool_call_counts[key] = tool_call_counts.get(key, 0) + 1
                 if tool_call_counts[key] > _MAX_SAME_TOOL_CALLS:
@@ -79,16 +74,10 @@ class Agent:
         if tool is None:
             raise KeyError(f"Tool '{tool_call.name}' not found")
 
-        if tool.is_sandboxed:
-            if self._sandbox is None:
-                return "오류: 이 도구는 샌드박스 환경이 필요합니다. 관리자에게 문의하세요."
-            return await self._sandbox.execute(
-                self._session_id or "default",
-                tool_call.name,
-                tool_call.arguments,
-                parent_session_id=self._parent_session_id,
-            )
-        return await self._tools.execute(tool_call.name, tool_call.arguments)
+        args = tool_call.arguments
+        if getattr(tool, "needs_session_context", False):
+            args = {**args, "_session_id": self._session_id or "default"}
+        return await self._tools.execute(tool_call.name, args)
 
     async def _execute_tools_parallel(self, tool_calls: list[ToolCall]) -> list[dict]:
         async def execute_one(tool_call: ToolCall) -> dict:
@@ -104,10 +93,18 @@ class Agent:
             except Exception as e:
                 logger.error("[tool] %s error: %s", tool_call.name, e)
                 result = f"Error: {e}"
+            is_screenshot = (
+                tool_call.name == "computer_use"
+                and tool_call.arguments.get("action") == "screenshot"
+                and isinstance(result, str)
+                and not result.startswith("스크린샷 실패")
+                and not result.startswith("Error")
+            )
             return {
                 "role": "tool",
                 "tool_call_id": tool_call.id,
                 "content": result,
+                "_is_image": is_screenshot,
             }
 
         return list(await asyncio.gather(*[execute_one(tc) for tc in tool_calls]))

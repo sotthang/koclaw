@@ -6,6 +6,20 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_SLACK_MAX_TEXT_LEN = 40000
+
+
+def _split_text(text: str) -> list[str]:
+    """40000자 초과 시 여러 청크로 분할"""
+    if len(text) <= _SLACK_MAX_TEXT_LEN:
+        return [text]
+    chunks = []
+    while text:
+        chunks.append(text[:_SLACK_MAX_TEXT_LEN])
+        text = text[_SLACK_MAX_TEXT_LEN:]
+    return chunks
+
+
 HELP_TEXT = """\
 *koclaw 사용 가이드*
 
@@ -20,8 +34,11 @@ HELP_TEXT = """\
   - `https://example.com/feed.xml 읽어줘`
 • *YouTube 요약* — 동영상 링크를 보내면 내용을 요약
 • *파일 분석* — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
-• *코드 실행* — Python 코드를 안전한 샌드박스에서 실행하고 결과 반환
-  - `파이썬으로 피보나치 수열 출력해줘`
+• *가상 데스크탑 제어* — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
+  - `네이버에서 AI 뉴스 검색해서 스크린샷 찍어줘`
+  - `https://example.com 열고 로그인 버튼 눌러줘`
+  - `이 CSV 파일로 matplotlib 차트 그려서 파일로 줘` — 컨테이너 파일 채팅 전송
+  - `첨부한 DOCX를 PDF로 변환해줘` — LibreOffice 문서 변환
 • *이메일 전송* — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
   - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
 
@@ -78,7 +95,7 @@ _TOOL_ICONS: dict[str, str] = {
     "web_search": "🔍",
     "browse": "🌐",
     "youtube": "🎬",
-    "code": "💻",
+    "computer_use": "🖥️",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",
@@ -92,10 +109,11 @@ def _tool_status_text(tool_name: str) -> str:
 
 
 class SlackChannel:
-    def __init__(self, app, agent_fn: AgentFn, db=None):
+    def __init__(self, app, agent_fn: AgentFn, db=None, computer_use_manager=None):
         self._app = app
         self._agent_fn = agent_fn
         self._db = db
+        self._cu_manager = computer_use_manager
 
     @staticmethod
     def _is_help_request(text: str) -> bool:
@@ -131,7 +149,13 @@ class SlackChannel:
             logger.error("[mention] error: %s", e)
             answer = f"❌ 처리 중 오류가 발생했습니다: {e}"
 
-        await client.chat_update(channel=channel, ts=ts, text=answer)
+        chunks = _split_text(answer)
+        await client.chat_update(channel=channel, ts=ts, text=chunks[0])
+        reply_kwargs = {"thread_ts": parsed["thread_ts"] or ts}
+        for chunk in chunks[1:]:
+            await say(chunk, **reply_kwargs)
+        await self._upload_screenshots(client, channel, parsed["session_id"], parsed["thread_ts"])
+        await self._upload_files(client, channel, parsed["session_id"], parsed["thread_ts"])
 
     _IGNORED_SUBTYPES = {"message_changed", "message_deleted", "bot_message"}
 
@@ -181,12 +205,57 @@ class SlackChannel:
             logger.error("[dm] error: %s", e)
             answer = f"❌ 처리 중 오류가 발생했습니다: {e}"
 
-        await client.chat_update(channel=channel_id, ts=ts, text=answer)
+        chunks = _split_text(answer)
+        await client.chat_update(channel=channel_id, ts=ts, text=chunks[0])
+        reply_kwargs = {"thread_ts": thread_ts or ts}
+        for chunk in chunks[1:]:
+            await say(chunk, **reply_kwargs)
+        await self._upload_screenshots(client, channel_id, session_id, thread_ts)
+        await self._upload_files(client, channel_id, session_id, thread_ts)
 
         if self._db:
             msg_id = await self._db.get_last_message_id(session_id)
             if msg_id:
                 await self._db.update_message_slack_ts(msg_id, ts)
+
+    async def _upload_screenshots(
+        self, client, channel: str, session_id: str, thread_ts: str | None
+    ) -> None:
+        if self._cu_manager is None:
+            return
+        screenshots = self._cu_manager.pop_screenshots(session_id)
+        for i, png_bytes in enumerate(screenshots, start=1):
+            try:
+                kwargs: dict = {
+                    "channel": channel,
+                    "content": png_bytes,
+                    "filename": f"screenshot_{i}.png",
+                    "filetype": "png",
+                }
+                if thread_ts:
+                    kwargs["thread_ts"] = thread_ts
+                await client.files_upload_v2(**kwargs)
+            except Exception as e:
+                logger.error("[screenshot] 업로드 실패: %s", e)
+
+    async def _upload_files(
+        self, client, channel: str, session_id: str, thread_ts: str | None
+    ) -> None:
+        if self._cu_manager is None:
+            return
+        files = self._cu_manager.pop_files(session_id)
+        for filename, data in files:
+            try:
+                kwargs: dict = {
+                    "channel": channel,
+                    "content": data,
+                    "filename": filename,
+                }
+                if thread_ts:
+                    kwargs["thread_ts"] = thread_ts
+                await client.files_upload_v2(**kwargs)
+            except Exception as e:
+                logger.error("[file_upload] 업로드 실패: %s", e)
 
     async def handle_reaction_added(self, event: dict, client, bot_user_id: str) -> None:
         if event.get("reaction") != "x":
@@ -218,10 +287,10 @@ async def start(
     tools,
     db,
     *,
-    sandbox=None,
     workspace: Path | None = None,
     notify_registry: dict | None = None,
     agent_registry: dict | None = None,
+    computer_use_manager=None,
 ) -> None:
     import httpx
     from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -272,7 +341,6 @@ async def start(
         db=db,
         file_fetcher=file_fetcher,
         session_tool_factories=session_tool_factories,
-        sandbox=sandbox,
         workspace=workspace,
     )
 
@@ -286,7 +354,9 @@ async def start(
     if agent_registry is not None:
         agent_registry[SESSION_ID_PREFIX] = agent_fn
 
-    channel = SlackChannel(app=app, agent_fn=agent_fn, db=db)
+    channel = SlackChannel(
+        app=app, agent_fn=agent_fn, db=db, computer_use_manager=computer_use_manager
+    )
     bot_user_id = (await app.client.auth_test())["user_id"]
 
     @app.event("app_mention")

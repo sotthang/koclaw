@@ -1,0 +1,33 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:99
+
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    firefox \
+    xdotool \
+    scrot \
+    openbox \
+    x11vnc \
+    novnc \
+    net-tools \
+    fonts-noto-cjk \
+    libreoffice \
+    libreoffice-l10n-ko \
+    python3-pip \
+    python3-dev \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir matplotlib pandas openpyxl pillow
+
+# openbox 메뉴 경고 억제
+RUN mkdir -p /var/lib/openbox && printf '<?xml version="1.0" encoding="UTF-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu">\n  <menu id="root-menu" label="Openbox 3"/>\n</openbox_menu>\n' > /var/lib/openbox/debian-menu.xml
+
+WORKDIR /app
+
+COPY docker/computer_use_startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
+
+CMD ["bash", "/app/startup.sh"]

@@ -19,8 +19,11 @@ HELP_TEXT = """\
   - `https://example.com/feed.xml 읽어줘`
 • **YouTube 요약** — 동영상 링크를 보내면 내용을 요약
 • **파일 분석** — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
-• **코드 실행** — Python 코드를 안전한 샌드박스에서 실행하고 결과 반환
-  - `파이썬으로 피보나치 수열 출력해줘`
+• **가상 데스크탑 제어** — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
+  - `네이버에서 AI 뉴스 검색해서 스크린샷 찍어줘`
+  - `https://example.com 열고 로그인 버튼 눌러줘`
+  - `이 CSV 파일로 matplotlib 차트 그려서 파일로 줘` — 컨테이너 파일 채팅 전송
+  - `첨부한 DOCX를 PDF로 변환해줘` — LibreOffice 문서 변환
 • **이메일 전송** — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
   - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
 
@@ -52,7 +55,7 @@ _TOOL_ICONS: dict[str, str] = {
     "web_search": "🔍",
     "browse": "🌐",
     "youtube": "🎬",
-    "code": "💻",
+    "computer_use": "🖥️",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",
@@ -107,9 +110,10 @@ def parse_discord_message(message, bot_user_id: int) -> dict:
 
 
 class DiscordChannel:
-    def __init__(self, agent_fn: AgentFn, db=None):
+    def __init__(self, agent_fn: AgentFn, db=None, computer_use_manager=None):
         self._agent_fn = agent_fn
         self._db = db
+        self._cu_manager = computer_use_manager
 
     @staticmethod
     def _is_help_request(text: str) -> bool:
@@ -180,6 +184,38 @@ class DiscordChannel:
             answer = f"❌ 처리 중 오류가 발생했습니다: {e}"
 
         await thinking.edit(content=answer)
+        await self._upload_screenshots(message.channel, parsed["session_id"])
+        await self._upload_files(message.channel, parsed["session_id"])
+
+    async def _upload_screenshots(self, channel, session_id: str) -> None:
+        if self._cu_manager is None:
+            return
+        import io
+
+        import discord
+
+        screenshots = self._cu_manager.pop_screenshots(session_id)
+        for i, png_bytes in enumerate(screenshots, start=1):
+            try:
+                await channel.send(
+                    file=discord.File(io.BytesIO(png_bytes), filename=f"screenshot_{i}.png")
+                )
+            except Exception as e:
+                logger.error("[screenshot] Discord 업로드 실패: %s", e)
+
+    async def _upload_files(self, channel, session_id: str) -> None:
+        if self._cu_manager is None:
+            return
+        import io
+
+        import discord
+
+        files = self._cu_manager.pop_files(session_id)
+        for filename, data in files:
+            try:
+                await channel.send(file=discord.File(io.BytesIO(data), filename=filename))
+            except Exception as e:
+                logger.error("[file_upload] Discord 업로드 실패: %s", e)
 
 
 async def start(
@@ -188,10 +224,10 @@ async def start(
     tools,
     db,
     *,
-    sandbox=None,
     workspace: Path | None = None,
     notify_registry: dict | None = None,
     agent_registry: dict | None = None,
+    computer_use_manager=None,
 ) -> None:
     try:
         import discord
@@ -229,7 +265,6 @@ async def start(
         db=db,
         file_fetcher=_discord_file_fetcher,
         session_tool_factories=session_tool_factories,
-        sandbox=sandbox,
         workspace=workspace,
         response_formatter=lambda x: x,
         format_instructions=_DISCORD_FORMAT_INSTRUCTIONS,
@@ -257,7 +292,9 @@ async def start(
     if agent_registry is not None:
         agent_registry[SESSION_ID_PREFIX] = agent_fn
 
-    channel_handler = DiscordChannel(agent_fn=agent_fn, db=db)
+    channel_handler = DiscordChannel(
+        agent_fn=agent_fn, db=db, computer_use_manager=computer_use_manager
+    )
 
     @client.event
     async def on_ready():

@@ -11,6 +11,7 @@ from koclaw.providers.openai import OpenAIProvider
 
 # ── create_provider ───────────────────────────────────────────────────────────
 
+
 class TestCreateProvider:
     def test_creates_claude_provider(self):
         provider = create_provider({"DEFAULT_LLM_PROVIDER": "claude", "ANTHROPIC_API_KEY": "key"})
@@ -25,11 +26,13 @@ class TestCreateProvider:
         assert isinstance(provider, GeminiProvider)
 
     def test_gemini_uses_default_model_from_env(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "gemini",
-            "GEMINI_API_KEY": "key",
-            "DEFAULT_MODEL": "gemini-1.5-flash",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "gemini",
+                "GEMINI_API_KEY": "key",
+                "DEFAULT_MODEL": "gemini-1.5-flash",
+            }
+        )
         assert isinstance(provider, GeminiProvider)
         assert provider._model == "gemini-1.5-flash"
 
@@ -38,11 +41,13 @@ class TestCreateProvider:
         assert isinstance(provider, OllamaProvider)
 
     def test_creates_fallback_chain_when_multiple_keys(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "claude",
-            "ANTHROPIC_API_KEY": "key1",
-            "OPENAI_API_KEY": "key2",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "claude",
+                "ANTHROPIC_API_KEY": "key1",
+                "OPENAI_API_KEY": "key2",
+            }
+        )
         assert isinstance(provider, FallbackProvider)
 
     def test_raises_when_no_provider_configured(self):
@@ -50,78 +55,93 @@ class TestCreateProvider:
             create_provider({})
 
     def test_fallback_providers_from_env(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "key1",
-            "FALLBACK_LLM_PROVIDERS": "claude",
-            "ANTHROPIC_API_KEY": "key2",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "key1",
+                "FALLBACK_LLM_PROVIDERS": "claude",
+                "ANTHROPIC_API_KEY": "key2",
+            }
+        )
         assert isinstance(provider, FallbackProvider)
         assert isinstance(provider._providers[0], OpenAIProvider)
         assert isinstance(provider._providers[1], ClaudeProvider)
 
     def test_fallback_providers_multiple(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "key1",
-            "FALLBACK_LLM_PROVIDERS": "claude,gemini",
-            "ANTHROPIC_API_KEY": "key2",
-            "GEMINI_API_KEY": "key3",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "key1",
+                "FALLBACK_LLM_PROVIDERS": "claude,gemini",
+                "ANTHROPIC_API_KEY": "key2",
+                "GEMINI_API_KEY": "key3",
+            }
+        )
         assert isinstance(provider, FallbackProvider)
         assert len(provider._providers) == 3
 
     def test_fallback_provider_skipped_without_api_key(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "key1",
-            "FALLBACK_LLM_PROVIDERS": "claude",
-            # ANTHROPIC_API_KEY 없음
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "key1",
+                "FALLBACK_LLM_PROVIDERS": "claude",
+                # ANTHROPIC_API_KEY 없음
+            }
+        )
         assert isinstance(provider, OpenAIProvider)
 
     def test_per_provider_model_overrides_default_model(self):
         """CLAUDE_MODEL이 있으면 DEFAULT_MODEL 대신 사용"""
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "claude",
-            "ANTHROPIC_API_KEY": "key",
-            "CLAUDE_MODEL": "claude-opus-4-6",
-            "DEFAULT_MODEL": "claude-sonnet-4-6",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "claude",
+                "ANTHROPIC_API_KEY": "key",
+                "CLAUDE_MODEL": "claude-opus-4-6",
+                "DEFAULT_MODEL": "claude-sonnet-4-6",
+            }
+        )
         assert provider._model == "claude-opus-4-6"
 
     def test_openai_per_provider_model(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "key",
-            "OPENAI_MODEL": "gpt-5.3",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "key",
+                "OPENAI_MODEL": "gpt-5.3",
+            }
+        )
         assert provider._model == "gpt-5.3"
 
     def test_gemini_per_provider_model(self):
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "gemini",
-            "GEMINI_API_KEY": "key",
-            "GEMINI_MODEL": "gemini-3-flash-preview",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "gemini",
+                "GEMINI_API_KEY": "key",
+                "GEMINI_MODEL": "gemini-3-flash-preview",
+            }
+        )
         assert provider._model == "gemini-3-flash-preview"
 
     def test_fallback_uses_own_model_not_primary_model(self):
         """폴백 provider는 자신의 모델 설정을 사용"""
-        provider = create_provider({
-            "DEFAULT_LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "key1",
-            "OPENAI_MODEL": "gpt-5.3",
-            "FALLBACK_LLM_PROVIDERS": "claude",
-            "ANTHROPIC_API_KEY": "key2",
-            "CLAUDE_MODEL": "claude-sonnet-4-6",
-        })
+        provider = create_provider(
+            {
+                "DEFAULT_LLM_PROVIDER": "openai",
+                "OPENAI_API_KEY": "key1",
+                "OPENAI_MODEL": "gpt-5.3",
+                "FALLBACK_LLM_PROVIDERS": "claude",
+                "ANTHROPIC_API_KEY": "key2",
+                "CLAUDE_MODEL": "claude-sonnet-4-6",
+            }
+        )
         assert isinstance(provider, FallbackProvider)
         assert provider._providers[0]._model == "gpt-5.3"
         assert provider._providers[1]._model == "claude-sonnet-4-6"
 
 
 # ── create_agent_fn ───────────────────────────────────────────────────────────
+
 
 class TestCreateAgentFn:
     async def test_system_prompt_instructs_to_ignore_external_data_instructions(self, tmp_path):
@@ -132,9 +152,7 @@ class TestCreateAgentFn:
         await db.initialize()
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(
-            return_value=LLMResponse(content="응답", tool_calls=[])
-        )
+        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="응답", tool_calls=[]))
 
         agent_fn = create_agent_fn(provider=mock_provider, tools=ToolRegistry(), db=db)
         await agent_fn(session_id="ch_001", user_message="안녕", files=[])
@@ -153,9 +171,7 @@ class TestCreateAgentFn:
         await db.initialize()
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(
-            return_value=LLMResponse(content="응답", tool_calls=[])
-        )
+        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="응답", tool_calls=[]))
 
         agent_fn = create_agent_fn(provider=mock_provider, tools=ToolRegistry(), db=db)
         await agent_fn(session_id="ch_001", user_message="안녕", files=[])
@@ -175,9 +191,7 @@ class TestCreateAgentFn:
         await db.initialize()
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(
-            return_value=LLMResponse(content="응답", tool_calls=[])
-        )
+        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="응답", tool_calls=[]))
 
         agent_fn = create_agent_fn(provider=mock_provider, tools=ToolRegistry(), db=db)
         await agent_fn(session_id="ch_001", user_message="지금 몇시야", files=[])
@@ -285,9 +299,7 @@ class TestCreateAgentFn:
         await db.initialize()
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(
-            return_value=LLMResponse(content="응답", tool_calls=[])
-        )
+        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="응답", tool_calls=[]))
 
         captured = {}
 
@@ -396,7 +408,9 @@ class TestCreateAgentFn:
             await db.save_message("ch_001", "assistant", f"답변 {i}")
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="새 응답", tool_calls=[]))
+        mock_provider.complete = AsyncMock(
+            return_value=LLMResponse(content="새 응답", tool_calls=[])
+        )
 
         agent_fn = create_agent_fn(provider=mock_provider, tools=ToolRegistry(), db=db)
         await agent_fn(session_id="ch_001", user_message="새 질문", files=[])
@@ -422,11 +436,8 @@ class TestCreateAgentFn:
         await agent_fn(session_id="ch_001", user_message="계속해서 질문", files=[])
 
         call_kwargs = mock_provider.complete.call_args.kwargs
-        all_content = " ".join(
-            str(m.get("content", "")) for m in call_kwargs["messages"]
-        )
+        all_content = " ".join(str(m.get("content", "")) for m in call_kwargs["messages"])
         assert "파이썬" in all_content
-
 
     async def test_slack_file_saved_to_workspace(self, tmp_path):
         """Option A: workspace가 있으면 Slack 파일을 workspace/{session_id}/에 저장"""
@@ -584,56 +595,12 @@ class TestCreateAgentFn:
         assert len(image_parts) == 1
         assert image_parts[0]["mime_type"] == "image/png"
 
-    async def test_sandbox_passed_to_agent(self, tmp_path):
-        """create_agent_fn에 sandbox를 넘기면 Agent에 전달되어 sandboxed tool에 사용된다."""
-        from unittest.mock import AsyncMock as _AsyncMock
-
-        from koclaw.core.llm import ToolCall
-        from koclaw.core.tool import Tool, ToolRegistry
-        from koclaw.storage.db import Database
-
-        class SandboxedTool(Tool):
-            name = "secure_op"
-            description = "격리 tool"
-            parameters = {"type": "object", "properties": {}, "required": []}
-            is_sandboxed = True
-
-            async def execute(self) -> str:
-                return "직접 실행됨 (오류)"
-
-        db = Database(tmp_path / "test.db")
-        await db.initialize()
-
-        mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(side_effect=[
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="secure_op", arguments={})
-            ]),
-            LLMResponse(content="sandbox 완료", tool_calls=[]),
-        ])
-
-        mock_sandbox = _AsyncMock()
-        mock_sandbox.execute = _AsyncMock(return_value="sandbox 결과")
-
-        registry = ToolRegistry()
-        registry.register(SandboxedTool())
-
-        agent_fn = create_agent_fn(
-            provider=mock_provider,
-            tools=registry,
-            db=db,
-            sandbox=mock_sandbox,
-        )
-        result = await agent_fn(session_id="ch_123", user_message="격리 실행해줘", files=[])
-
-        mock_sandbox.execute.assert_called_once_with("ch_123", "secure_op", {}, parent_session_id=None)
-        assert result == "sandbox 완료"
-
 
 class TestFileDownloadSizeLimit:
     async def test_oversized_file_is_skipped_and_user_notified(self, tmp_path, monkeypatch):
         """파일이 크기 제한 초과 시 처리를 건너뛰고 사용자에게 안내한다."""
         import koclaw.app as app_module
+
         monkeypatch.setattr(app_module, "_MAX_FILE_DOWNLOAD_BYTES", 10)
 
         from koclaw.core.tool import ToolRegistry
@@ -643,9 +610,7 @@ class TestFileDownloadSizeLimit:
         await db.initialize()
 
         mock_provider = AsyncMock()
-        mock_provider.complete = AsyncMock(
-            return_value=LLMResponse(content="응답", tool_calls=[])
-        )
+        mock_provider.complete = AsyncMock(return_value=LLMResponse(content="응답", tool_calls=[]))
 
         async def oversized_fetcher(url: str) -> bytes:
             return b"x" * 100  # 10바이트 제한 초과
@@ -669,6 +634,7 @@ class TestFileDownloadSizeLimit:
     async def test_normal_sized_file_is_processed(self, tmp_path, monkeypatch):
         """크기 제한 이하인 파일은 정상 처리된다."""
         import koclaw.app as app_module
+
         monkeypatch.setattr(app_module, "_MAX_FILE_DOWNLOAD_BYTES", 1024)
 
         from koclaw.core.tool import ToolRegistry

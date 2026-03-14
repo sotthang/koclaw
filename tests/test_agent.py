@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
 from koclaw.core.agent import Agent
@@ -7,6 +5,7 @@ from koclaw.core.llm import LLMProvider, LLMResponse, ToolCall
 from koclaw.core.tool import Tool, ToolRegistry
 
 # ── Fakes ──────────────────────────────────────────────────────────────────
+
 
 class EchoTool(Tool):
     name = "echo"
@@ -29,20 +28,17 @@ class CountingProvider(LLMProvider):
         self._responses = iter(responses)
         self.call_count = 0
 
-    async def complete(
-        self, messages: list[dict], tools: list[dict] | None = None
-    ) -> LLMResponse:
+    async def complete(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
         self.call_count += 1
         return next(self._responses)
 
 
 # ── Tests ──────────────────────────────────────────────────────────────────
 
+
 class TestAgentDirectResponse:
     async def test_returns_llm_content_when_no_tool_calls(self):
-        provider = CountingProvider([
-            LLMResponse(content="안녕하세요!", tool_calls=[])
-        ])
+        provider = CountingProvider([LLMResponse(content="안녕하세요!", tool_calls=[])])
         agent = Agent(provider=provider, tools=ToolRegistry())
 
         result = await agent.run("안녕")
@@ -50,9 +46,7 @@ class TestAgentDirectResponse:
         assert result == "안녕하세요!"
 
     async def test_user_message_included_in_llm_call(self):
-        provider = CountingProvider([
-            LLMResponse(content="응답", tool_calls=[])
-        ])
+        provider = CountingProvider([LLMResponse(content="응답", tool_calls=[])])
         agent = Agent(provider=provider, tools=ToolRegistry())
 
         await agent.run("테스트 메시지")
@@ -64,10 +58,12 @@ class TestAgentDirectResponse:
 class TestAgentToolExecution:
     async def test_executes_tool_and_returns_final_response(self):
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "tool 결과"})
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[tool_call]),
-            LLMResponse(content="tool 결과를 받았습니다", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content=None, tool_calls=[tool_call]),
+                LLMResponse(content="tool 결과를 받았습니다", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(EchoTool())
         agent = Agent(provider=provider, tools=registry)
@@ -103,13 +99,18 @@ class TestAgentToolExecution:
                 execution_order.append("fast")
                 return "fast done"
 
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="slow", arguments={}),
-                ToolCall(id="2", name="fast", arguments={}),
-            ]),
-            LLMResponse(content="둘 다 완료", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(
+                    content=None,
+                    tool_calls=[
+                        ToolCall(id="1", name="slow", arguments={}),
+                        ToolCall(id="2", name="fast", arguments={}),
+                    ],
+                ),
+                LLMResponse(content="둘 다 완료", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(SlowTool())
         registry.register(FastTool())
@@ -134,10 +135,12 @@ class TestAgentErrorHandling:
                 raise RuntimeError("tool 실패!")
 
         tool_call = ToolCall(id="1", name="failing", arguments={})
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[tool_call]),
-            LLMResponse(content="에러가 발생했네요", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content=None, tool_calls=[tool_call]),
+                LLMResponse(content="에러가 발생했네요", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(FailingTool())
         agent = Agent(provider=provider, tools=registry)
@@ -193,153 +196,6 @@ class TestAgentSystemPrompt:
         assert "system" not in roles
 
 
-class TestAgentSandboxRouting:
-    """is_sandboxed=True 인 tool은 SandboxManager를 통해 실행되어야 한다."""
-
-    def _make_sandboxed_tool(self, result: str = "sandbox 결과") -> Tool:
-        class SandboxedTool(Tool):
-            name = "secure_op"
-            description = "격리 실행이 필요한 tool"
-            parameters = {"type": "object", "properties": {}, "required": []}
-            is_sandboxed = True
-
-            async def execute(self) -> str:  # 직접 호출되면 안 됨
-                return "직접 실행됨 (오류)"
-
-        return SandboxedTool()
-
-    async def test_sandboxed_tool_uses_sandbox_manager(self):
-        """is_sandboxed tool 실행 시 sandbox.execute()가 호출된다."""
-        tool = self._make_sandboxed_tool()
-        registry = ToolRegistry()
-        registry.register(tool)
-
-        mock_sandbox = AsyncMock()
-        mock_sandbox.execute = AsyncMock(return_value="sandbox 결과")
-
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="secure_op", arguments={})
-            ]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
-        agent = Agent(provider=provider, tools=registry, sandbox=mock_sandbox, session_id="sess-x")
-
-        await agent.run("격리 실행해줘")
-
-        mock_sandbox.execute.assert_called_once_with("sess-x", "secure_op", {}, parent_session_id=None)
-
-    async def test_sandboxed_tool_forwards_parent_session_id(self):
-        """parent_session_id가 있으면 sandbox.execute에 전달된다."""
-        tool = self._make_sandboxed_tool()
-        registry = ToolRegistry()
-        registry.register(tool)
-
-        mock_sandbox = AsyncMock()
-        mock_sandbox.execute = AsyncMock(return_value="sandbox 결과")
-
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="secure_op", arguments={})
-            ]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
-        agent = Agent(
-            provider=provider, tools=registry, sandbox=mock_sandbox,
-            session_id="slack:C001:9999.0", parent_session_id="slack:C001",
-        )
-
-        await agent.run("격리 실행해줘")
-
-        mock_sandbox.execute.assert_called_once_with(
-            "slack:C001:9999.0", "secure_op", {}, parent_session_id="slack:C001"
-        )
-
-    async def test_safe_tool_does_not_use_sandbox(self):
-        """is_sandboxed=False tool은 sandbox를 거치지 않고 직접 실행된다."""
-        registry = ToolRegistry()
-        registry.register(EchoTool())
-
-        mock_sandbox = AsyncMock()
-        mock_sandbox.execute = AsyncMock()
-
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="echo", arguments={"message": "hi"})
-            ]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
-        agent = Agent(provider=provider, tools=registry, sandbox=mock_sandbox, session_id="sess-y")
-
-        await agent.run("직접 실행해줘")
-
-        mock_sandbox.execute.assert_not_called()
-
-
-class TestAgentSandboxMissing:
-    """sandbox=None 일 때 sandboxed tool은 실행되지 않아야 한다."""
-
-    def _make_sandboxed_tool(self) -> Tool:
-        class SandboxedTool(Tool):
-            name = "secure_op"
-            description = "격리 실행이 필요한 tool"
-            parameters = {"type": "object", "properties": {}, "required": []}
-            is_sandboxed = True
-
-            async def execute(self) -> str:
-                return "직접 실행됨 (오류)"
-
-        return SandboxedTool()
-
-    async def test_sandboxed_tool_without_sandbox_returns_error(self):
-        """sandbox가 없을 때 sandboxed tool 호출 시 에러 문자열을 반환한다."""
-        tool = self._make_sandboxed_tool()
-        registry = ToolRegistry()
-        registry.register(tool)
-
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="secure_op", arguments={})
-            ]),
-            LLMResponse(content="오류 처리됨", tool_calls=[]),
-        ])
-        agent = Agent(provider=provider, tools=registry, session_id="sess-z")
-
-        await agent.run("격리 실행해줘")
-
-        tool_result_msg = agent.messages[2]
-        assert "오류" in tool_result_msg["content"] or "sandbox" in tool_result_msg["content"].lower()
-
-    async def test_sandboxed_tool_does_not_execute_directly_without_sandbox(self):
-        """sandbox 없으면 sandboxed tool의 execute()가 직접 호출되지 않는다."""
-        executed = []
-
-        class TrackingTool(Tool):
-            name = "track_op"
-            description = "추적용 tool"
-            parameters = {"type": "object", "properties": {}, "required": []}
-            is_sandboxed = True
-
-            async def execute(self) -> str:
-                executed.append(True)
-                return "직접 실행됨"
-
-        registry = ToolRegistry()
-        registry.register(TrackingTool())
-
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[
-                ToolCall(id="1", name="track_op", arguments={})
-            ]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
-        agent = Agent(provider=provider, tools=registry)
-
-        await agent.run("실행해줘")
-
-        assert executed == [], "sandboxed tool이 직접 실행되면 안 됨"
-
-
 class TestAgentToolStartCallback:
     async def test_on_tool_start_called_with_tool_name(self):
         """tool 실행 전 on_tool_start 콜백이 tool 이름과 함께 호출된다."""
@@ -349,10 +205,12 @@ class TestAgentToolStartCallback:
             called_with.append(tool_name)
 
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "hi"})
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[tool_call]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content=None, tool_calls=[tool_call]),
+                LLMResponse(content="완료", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(EchoTool())
         agent = Agent(provider=provider, tools=registry, on_tool_start=on_tool_start)
@@ -364,10 +222,12 @@ class TestAgentToolStartCallback:
     async def test_on_tool_start_not_required(self):
         """on_tool_start 없이도 정상 실행된다."""
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "hi"})
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[tool_call]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content=None, tool_calls=[tool_call]),
+                LLMResponse(content="완료", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(EchoTool())
         agent = Agent(provider=provider, tools=registry)
@@ -378,14 +238,17 @@ class TestAgentToolStartCallback:
 
     async def test_on_tool_start_error_does_not_stop_execution(self):
         """콜백에서 예외가 발생해도 tool 실행은 계속된다."""
+
         async def failing_callback(tool_name: str) -> None:
             raise RuntimeError("콜백 오류")
 
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "hi"})
-        provider = CountingProvider([
-            LLMResponse(content=None, tool_calls=[tool_call]),
-            LLMResponse(content="완료", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content=None, tool_calls=[tool_call]),
+                LLMResponse(content="완료", tool_calls=[]),
+            ]
+        )
         registry = ToolRegistry()
         registry.register(EchoTool())
         agent = Agent(provider=provider, tools=registry, on_tool_start=failing_callback)
@@ -412,10 +275,18 @@ class TestAgentLoopDetection:
     async def test_different_args_do_not_trigger_loop_detection(self):
         """같은 tool이라도 args가 다르면 루프로 감지하지 않는다."""
         responses = [
-            LLMResponse(content=None, tool_calls=[ToolCall(id="1", name="echo", arguments={"message": "a"})]),
-            LLMResponse(content=None, tool_calls=[ToolCall(id="2", name="echo", arguments={"message": "b"})]),
-            LLMResponse(content=None, tool_calls=[ToolCall(id="3", name="echo", arguments={"message": "c"})]),
-            LLMResponse(content=None, tool_calls=[ToolCall(id="4", name="echo", arguments={"message": "d"})]),
+            LLMResponse(
+                content=None, tool_calls=[ToolCall(id="1", name="echo", arguments={"message": "a"})]
+            ),
+            LLMResponse(
+                content=None, tool_calls=[ToolCall(id="2", name="echo", arguments={"message": "b"})]
+            ),
+            LLMResponse(
+                content=None, tool_calls=[ToolCall(id="3", name="echo", arguments={"message": "c"})]
+            ),
+            LLMResponse(
+                content=None, tool_calls=[ToolCall(id="4", name="echo", arguments={"message": "d"})]
+            ),
             LLMResponse(content="완료", tool_calls=[]),
         ]
         provider = CountingProvider(responses)
@@ -444,10 +315,12 @@ class TestAgentLoopDetection:
 
 class TestAgentHistory:
     async def test_maintains_conversation_history(self):
-        provider = CountingProvider([
-            LLMResponse(content="첫 번째 응답", tool_calls=[]),
-            LLMResponse(content="두 번째 응답", tool_calls=[]),
-        ])
+        provider = CountingProvider(
+            [
+                LLMResponse(content="첫 번째 응답", tool_calls=[]),
+                LLMResponse(content="두 번째 응답", tool_calls=[]),
+            ]
+        )
         agent = Agent(provider=provider, tools=ToolRegistry())
 
         await agent.run("첫 번째 메시지")

@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from koclaw.channels import parse_parent_session_id
 from koclaw.core.agent import Agent
 from koclaw.core.file_parser import FileParser
 from koclaw.core.llm import FallbackProvider, LLMProvider
@@ -134,7 +133,18 @@ def _build_system_prompt(
 - 웹페이지 읽기: URL을 받으면 browse tool로 페이지 전체 내용을 가져와 분석하세요
 - YouTube 동영상 자막/내용 요약
 - PDF, 이미지, 문서 파일 분석
-- 코드 작성 및 실행 (Docker 컨테이너 내 안전한 샌드박스)
+- 가상 데스크탑 제어 (computer_use tool): 브라우저 열기, 클릭, 텍스트 입력, 스크린샷 등 GUI 자동화
+  - run_command로 셸 명령 실행 가능: 패키지 설치(apt-get install), 파이썬 스크립트 실행, 파일 조작 등
+  - 명령 실행 중 에러가 나면 출력을 읽고 원인을 파악해 후속 명령으로 스스로 해결하세요
+  - screenshot 결과는 채널에 이미지 파일로 자동 업로드됩니다. 응답 텍스트에 마크다운 이미지(![...](...)나 attachment 참조)를 포함하지 마세요
+  - screenshot은 작업 완료 후 최종 결과 확인 시에만 1회 찍으세요. 매 액션마다 찍지 마세요
+  - 웹 검색은 open_url로 검색 URL을 직접 구성하세요. 예: 구글 검색은 open_url(url="https://www.google.com/search?q=검색어") 형태로 사용
+  - 브라우저에 텍스트를 입력할 때는 반드시 type 액션으로 타이핑한 후 key(key_name="Return")로 제출하세요
+  - 사용자가 첨부한 파일은 컨테이너의 /workspace/ 디렉토리에서 읽기 전용으로 접근 가능 (별도 복사 불필요)
+  - 결과 파일은 /tmp/ 등 컨테이너 내부에 저장하고 copy_from으로 채팅에 전송
+  - copy_from(container_path)으로 컨테이너 파일을 채팅에 파일로 전송 — 차트·PDF·CSV 등
+  - LibreOffice 사전 설치: 문서 변환 가능 (예: libreoffice --headless --convert-to pdf /workspace/file.docx --outdir /tmp/)
+  - Python 데이터 분석 라이브러리 사전 설치: matplotlib, pandas, openpyxl, pillow
 - 한국어 문서 처리 (HWP 파일 포함)
 - 장기 기억 저장/조회 (memory tool):
   - 사용자가 기억을 요청하거나 이전 기억이 필요한 질문을 하면 반드시 memory tool을 먼저 호출하세요
@@ -143,8 +153,12 @@ def _build_system_prompt(
     - channel: 채널 또는 스레드에서 저장 가능, 해당 채널과 채널의 모든 스레드에 적용
     - thread: 스레드에서만 저장 가능, 해당 스레드에만 적용
   - 현재 대화 컨텍스트(DM/채널/스레드)에 맞는 scope만 사용하세요
-- 파일 분석: 첨부파일은 file tool(scope=session)로 직접 읽어서 분석하세요.
-  PDF, HWPX, 텍스트 등 다양한 포맷을 지원합니다.
+- 파일 처리 판단 기준:
+  사용자가 채팅에 첨부한 파일은 세션 워크스페이스와 컨테이너 /workspace/ 에 동시에 접근 가능합니다.
+
+  내용만 읽으면 됨 → file tool(scope=session)로 읽기
+  실행·변환·가공 필요 → computer_use run_command로 /workspace/<파일명> 읽기 → 결과는 /tmp/에 저장 → copy_from으로 채팅 전송
+
   파일이 저장되었다는 안내를 받으면 먼저 file(action=list, scope=session)로 파일 목록을
   확인하고, file(action=read, scope=session)로 읽으세요
 - 일반 질문 답변 및 대화
@@ -214,7 +228,6 @@ def create_agent_fn(
     db: Database,
     file_fetcher: FileFetcher | None = None,
     session_tool_factories: list[SessionToolFactory] | None = None,
-    sandbox=None,
     workspace: str | Path | None = None,
     response_formatter: Callable[[str], str] = to_slack_mrkdwn,
     format_instructions: str = _SLACK_FORMAT_INSTRUCTIONS,
@@ -238,8 +251,6 @@ def create_agent_fn(
         summary = await db.get_summary(session_id)
         history = await db.get_messages(session_id, limit=10)
 
-        parent_session_id = parse_parent_session_id(session_id)
-
         session_tools = tools.clone()
         if session_tool_factories:
             for factory in session_tool_factories:
@@ -248,9 +259,7 @@ def create_agent_fn(
             provider=provider,
             tools=session_tools,
             system_prompt=_build_system_prompt(format_instructions, memory_section),
-            sandbox=sandbox,
             session_id=session_id,
-            parent_session_id=parent_session_id,
             on_tool_start=progress_callback,
         )
         agent.messages = []

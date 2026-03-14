@@ -6,6 +6,7 @@ class Tool(ABC):
     description: str
     parameters: dict
     is_sandboxed: bool = False
+    needs_session_context: bool = False
 
     def schema(self) -> dict:
         return {
@@ -51,6 +52,7 @@ class ToolRegistry:
     def load_installed(self) -> None:
         """entry_points 기반으로 설치된 tool을 자동 등록"""
         from importlib.metadata import entry_points
+
         for ep in entry_points(group="koclaw.tools"):
             tool_cls = ep.load()
             self.register(tool_cls())

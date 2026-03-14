@@ -12,6 +12,7 @@ from koclaw.channels import match_registry
 from koclaw.core.computer_use_manager import ComputerUseManager
 from koclaw.core.scheduler_loop import SchedulerLoop
 from koclaw.core.tool import ToolRegistry
+from koclaw.core.windows_computer_use_manager import WindowsComputerUseManager
 from koclaw.storage.db import Database
 from koclaw.tools.browse import BrowseTool
 from koclaw.tools.computer_use import ComputerUseTool

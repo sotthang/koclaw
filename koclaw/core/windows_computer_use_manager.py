@@ -179,6 +179,18 @@ class WindowsComputerUseManager:
         self._files.setdefault(session_id, []).append((filename, file_bytes))
         return f"✅ {filename} ({len(file_bytes):,} bytes) — 채팅에 파일로 업로드됩니다"
 
+    async def list_windows(self, session_id: str) -> str:
+        """현재 열려 있는 창 목록을 반환한다."""
+        try:
+            data = await self._get("/windows")
+        except httpx.HTTPError as e:
+            return f"창 목록 조회 실패: {e}"
+        windows = data.get("windows", [])
+        if not windows:
+            return "열려 있는 창이 없습니다."
+        lines = [f"• {w.get('Name', '?')} — {w.get('MainWindowTitle', '')}" for w in windows]
+        return "현재 열려 있는 창 목록:\n" + "\n".join(lines)
+
     async def reset(self, session_id: str) -> str:
         """세션 상태(스크린샷·파일 큐)를 초기화한다."""
         self._screenshots.pop(session_id, None)

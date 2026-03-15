@@ -268,6 +268,41 @@ async def read_file(req: ReadFileRequest):
     }
 
 
+@app.get("/windows", dependencies=[Auth])
+async def list_windows():
+    """현재 열려 있는 창 목록을 반환한다 (MainWindowTitle이 있는 프로세스만)."""
+
+    def _run():
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-Process | Where-Object { $_.MainWindowTitle -ne '' } "
+                "| Select-Object Name, MainWindowTitle "
+                "| ConvertTo-Json -Compress",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return result.stdout.strip()
+
+    import json as _json
+
+    raw = await asyncio.to_thread(_run)
+    try:
+        data = _json.loads(raw) if raw else []
+        # 단일 항목이면 리스트로 감싸기
+        if isinstance(data, dict):
+            data = [data]
+    except _json.JSONDecodeError:
+        data = []
+    return {"windows": data}
+
+
 @app.get("/stream")
 async def stream():
     """MJPEG 스트림 — 브라우저에서 실시간 화면 시청 (인증 불필요)."""

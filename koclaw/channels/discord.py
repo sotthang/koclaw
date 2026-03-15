@@ -168,7 +168,10 @@ class DiscordChannel:
             return
 
         async def progress_callback(tool_name: str) -> None:
-            await thinking.edit(content=_tool_status_text(tool_name))
+            text = _tool_status_text(tool_name)
+            if tool_name == "computer_use" and hasattr(self._cu_manager, "view_url"):
+                text += f"\n🖥️ 화면 보기: {self._cu_manager.view_url()}"
+            await thinking.edit(content=text)
 
         try:
             answer = await self._agent_fn(

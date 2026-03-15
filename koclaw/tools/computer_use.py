@@ -24,6 +24,7 @@ class ComputerUseTool(Tool):
                 "type": "string",
                 "enum": [
                     "get_screen_size",
+                    "list_windows",
                     "screenshot",
                     "click",
                     "double_click",
@@ -38,6 +39,7 @@ class ComputerUseTool(Tool):
                 ],
                 "description": (
                     "get_screen_size: 화면 해상도 조회 — 좌표 계산 전 먼저 호출 권장 | "
+                    "list_windows: 현재 열려 있는 창 목록 조회 | "
                     "screenshot: 현재 화면 캡처 | "
                     "click: 좌표 클릭 (x, y 필요) | "
                     "double_click: 좌표 더블클릭 (x, y 필요) | "
@@ -93,6 +95,11 @@ class ComputerUseTool(Tool):
             if hasattr(self._manager, "get_screen_size"):
                 return await self._manager.get_screen_size(session_id)
             return "지원하지 않는 액션입니다 (Docker 모드에서는 get_screen_size 불필요)"
+
+        if action == "list_windows":
+            if hasattr(self._manager, "list_windows"):
+                return await self._manager.list_windows(session_id)
+            return "지원하지 않는 액션입니다 (Windows Agent 모드에서만 사용 가능)"
 
         if action == "screenshot":
             return await self._manager.screenshot(session_id)

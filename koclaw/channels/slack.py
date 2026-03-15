@@ -134,7 +134,10 @@ class SlackChannel:
             return
 
         async def progress_callback(tool_name: str) -> None:
-            await client.chat_update(channel=channel, ts=ts, text=_tool_status_text(tool_name))
+            text = _tool_status_text(tool_name)
+            if tool_name == "computer_use" and hasattr(self._cu_manager, "view_url"):
+                text += f"\n🖥️ 화면 보기: {self._cu_manager.view_url()}"
+            await client.chat_update(channel=channel, ts=ts, text=text)
 
         try:
             answer = await self._agent_fn(
@@ -190,7 +193,10 @@ class SlackChannel:
         user_id = event.get("user")
 
         async def progress_callback(tool_name: str) -> None:
-            await client.chat_update(channel=channel_id, ts=ts, text=_tool_status_text(tool_name))
+            msg = _tool_status_text(tool_name)
+            if tool_name == "computer_use" and hasattr(self._cu_manager, "view_url"):
+                msg += f"\n🖥️ 화면 보기: {self._cu_manager.view_url()}"
+            await client.chat_update(channel=channel_id, ts=ts, text=msg)
 
         try:
             answer = await self._agent_fn(

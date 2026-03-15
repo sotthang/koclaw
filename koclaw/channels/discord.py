@@ -83,6 +83,20 @@ def _tool_status_text(tool_name: str, args: dict | None = None) -> str:
     return f"{icon} `{tool_name}` 실행 중..."
 
 
+_DISCORD_MAX_TEXT_LEN = 2000
+
+
+def _split_text(text: str) -> list[str]:
+    """2000자 초과 시 여러 청크로 분할"""
+    if len(text) <= _DISCORD_MAX_TEXT_LEN:
+        return [text]
+    chunks = []
+    while text:
+        chunks.append(text[:_DISCORD_MAX_TEXT_LEN])
+        text = text[_DISCORD_MAX_TEXT_LEN:]
+    return chunks
+
+
 SESSION_ID_PREFIX = "discord:"
 
 
@@ -201,7 +215,10 @@ class DiscordChannel:
             logger.error("[discord] error: %s", e)
             answer = f"❌ 처리 중 오류가 발생했습니다: {e}"
 
-        await thinking.edit(content=answer)
+        chunks = _split_text(answer)
+        await thinking.edit(content=chunks[0])
+        for chunk in chunks[1:]:
+            await message.channel.send(chunk)
         await self._upload_screenshots(message.channel, parsed["session_id"])
         await self._upload_files(message.channel, parsed["session_id"])
 

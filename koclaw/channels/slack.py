@@ -370,8 +370,14 @@ async def start(
     )
 
     async def notify_fn(session_id: str, message: str) -> None:
-        # "slack:C001" or "slack:C001:9999.0000" → channel_id = "C001"
-        channel_id = session_id.removeprefix("slack:").split(":")[0]
+        parts = session_id.removeprefix("slack:").split(":")
+        # "slack:dm:USER_ID" → DM 채널 열기
+        if parts[0] == "dm" and len(parts) >= 2:
+            resp = await app.client.conversations_open(users=parts[1])
+            channel_id = resp["channel"]["id"]
+        else:
+            # "slack:C001" or "slack:C001:9999.0000" → channel_id = "C001"
+            channel_id = parts[0]
         await app.client.chat_postMessage(channel=channel_id, text=message)
 
     if notify_registry is not None:

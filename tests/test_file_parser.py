@@ -192,7 +192,10 @@ class TestFileParserDOCX:
         assert "첫 번째 단락" in result.content
         assert "두 번째 단락" in result.content
         assert result.name == "report.docx"
-        assert result.mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        assert (
+            result.mime_type
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
     async def test_docx_parse_error_returns_error_message(self, tmp_path):
         docx_file = tmp_path / "broken.docx"
@@ -213,6 +216,234 @@ class TestFileParserDOCX:
             result = await parser.parse(path=docx_file)
 
         assert "설치" in result.content or "python-docx" in result.content
+
+
+class TestFileParserHWP:
+    async def test_parses_hwp_via_hwp5txt(self, tmp_path):
+        hwp_file = tmp_path / "doc.hwp"
+        hwp_file.write_bytes(b"\xd0\xcf\x11\xe0fake hwp")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "한글 구버전 문서 내용"
+            mock_run.return_value.stderr = ""
+
+            parser = FileParser()
+            result = await parser.parse(path=hwp_file)
+
+        assert "한글 구버전 문서 내용" in result.content
+        assert result.mime_type == "application/x-hwp"
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0][0] == "hwp5txt"
+
+    async def test_hwp_parse_error_returns_error_message(self, tmp_path):
+        hwp_file = tmp_path / "broken.hwp"
+        hwp_file.write_bytes(b"not hwp")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 1
+            mock_run.return_value.stdout = ""
+            mock_run.return_value.stderr = "파싱 실패"
+
+            parser = FileParser()
+            result = await parser.parse(path=hwp_file)
+
+        assert "오류" in result.content
+
+    async def test_hwp_returns_error_when_pyhwp_not_installed(self, tmp_path):
+        hwp_file = tmp_path / "doc.hwp"
+        hwp_file.write_bytes(b"\xd0\xcf\x11\xe0fake")
+
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            parser = FileParser()
+            result = await parser.parse(path=hwp_file)
+
+        assert "pyhwp" in result.content or "설치" in result.content
+
+
+class TestFileParserXLSX:
+    async def test_parses_xlsx_as_markdown_table(self, tmp_path):
+        xlsx_file = tmp_path / "data.xlsx"
+        xlsx_file.write_bytes(b"PK\x03\x04fake xlsx")
+
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+        mock_ws = MagicMock()
+
+        def make_cell(v):
+            c = MagicMock()
+            c.value = v
+            return c
+
+        row1 = [make_cell("이름"), make_cell("나이")]
+        row2 = [make_cell("홍길동"), make_cell(30)]
+        mock_ws.iter_rows.return_value = [row1, row2]
+        mock_wb.__getitem__.return_value = mock_ws
+
+        with patch("openpyxl.load_workbook", return_value=mock_wb):
+            parser = FileParser()
+            result = await parser.parse(path=xlsx_file)
+
+        assert "이름" in result.content
+        assert "홍길동" in result.content
+        assert "|" in result.content  # 마크다운 테이블 형식
+
+    async def test_xlsx_empty_sheet_returns_empty_message(self, tmp_path):
+        xlsx_file = tmp_path / "empty.xlsx"
+        xlsx_file.write_bytes(b"PK\x03\x04fake")
+
+        mock_wb = MagicMock()
+        mock_wb.sheetnames = ["Sheet1"]
+        mock_ws = MagicMock()
+        mock_ws.iter_rows.return_value = []
+        mock_wb.__getitem__.return_value = mock_ws
+
+        with patch("openpyxl.load_workbook", return_value=mock_wb):
+            parser = FileParser()
+            result = await parser.parse(path=xlsx_file)
+
+        assert "빈" in result.content or result.content == "(빈 파일)"
+
+    async def test_xlsx_returns_error_when_openpyxl_not_installed(self, tmp_path):
+        xlsx_file = tmp_path / "data.xlsx"
+        xlsx_file.write_bytes(b"PK\x03\x04fake")
+
+        with patch("builtins.__import__", side_effect=ImportError("No module named 'openpyxl'")):
+            pass  # import patch가 복잡하므로 직접 모듈 패치
+
+        with patch.dict("sys.modules", {"openpyxl": None}):
+            parser = FileParser()
+            result = await parser.parse(path=xlsx_file)
+
+        assert "openpyxl" in result.content or "설치" in result.content
+
+    async def test_xlsx_parse_error_returns_error_message(self, tmp_path):
+        xlsx_file = tmp_path / "broken.xlsx"
+        xlsx_file.write_bytes(b"not xlsx")
+
+        with patch("openpyxl.load_workbook", side_effect=Exception("파싱 오류")):
+            parser = FileParser()
+            result = await parser.parse(path=xlsx_file)
+
+        assert "오류" in result.content
+
+
+class TestFileParserPPTX:
+    async def test_parses_pptx_slide_texts(self, tmp_path):
+        pptx_file = tmp_path / "slides.pptx"
+        pptx_file.write_bytes(b"PK\x03\x04fake pptx")
+
+        mock_shape = MagicMock()
+        mock_shape.has_text_frame = True
+        mock_shape.text_frame.text = "슬라이드 제목입니다"
+
+        mock_slide = MagicMock()
+        mock_slide.shapes = [mock_shape]
+
+        mock_prs = MagicMock()
+        mock_prs.slides = [mock_slide]
+
+        with patch("pptx.Presentation", return_value=mock_prs):
+            parser = FileParser()
+            result = await parser.parse(path=pptx_file)
+
+        assert "슬라이드 1" in result.content
+        assert "슬라이드 제목입니다" in result.content
+
+    async def test_pptx_shapes_without_text_skipped(self, tmp_path):
+        pptx_file = tmp_path / "slides.pptx"
+        pptx_file.write_bytes(b"PK\x03\x04fake")
+
+        mock_shape_no_text = MagicMock()
+        mock_shape_no_text.has_text_frame = False
+
+        mock_slide = MagicMock()
+        mock_slide.shapes = [mock_shape_no_text]
+
+        mock_prs = MagicMock()
+        mock_prs.slides = [mock_slide]
+
+        with patch("pptx.Presentation", return_value=mock_prs):
+            parser = FileParser()
+            result = await parser.parse(path=pptx_file)
+
+        assert "텍스트 없음" in result.content
+
+    async def test_pptx_returns_error_when_package_not_installed(self, tmp_path):
+        pptx_file = tmp_path / "slides.pptx"
+        pptx_file.write_bytes(b"PK\x03\x04fake")
+
+        with patch.dict("sys.modules", {"pptx": None}):
+            parser = FileParser()
+            result = await parser.parse(path=pptx_file)
+
+        assert "python-pptx" in result.content or "설치" in result.content
+
+    async def test_pptx_parse_error_returns_error_message(self, tmp_path):
+        pptx_file = tmp_path / "broken.pptx"
+        pptx_file.write_bytes(b"not pptx")
+
+        with patch("pptx.Presentation", side_effect=Exception("파싱 오류")):
+            parser = FileParser()
+            result = await parser.parse(path=pptx_file)
+
+        assert "오류" in result.content
+
+
+class TestFileParserDOCXTables:
+    async def test_docx_table_extracted_as_markdown(self, tmp_path):
+        docx_file = tmp_path / "report.docx"
+        docx_file.write_bytes(b"PK\x03\x04fake docx")
+
+        def make_cell(text):
+            c = MagicMock()
+            c.text = text
+            return c
+
+        mock_row1 = MagicMock()
+        mock_row1.cells = [make_cell("이름"), make_cell("직책")]
+        mock_row2 = MagicMock()
+        mock_row2.cells = [make_cell("홍길동"), make_cell("개발자")]
+
+        mock_table = MagicMock()
+        mock_table.rows = [mock_row1, mock_row2]
+
+        mock_doc = MagicMock()
+        mock_doc.paragraphs = []
+        mock_doc.tables = [mock_table]
+
+        with patch("koclaw.core.file_parser.Document", return_value=mock_doc):
+            parser = FileParser()
+            result = await parser.parse(path=docx_file)
+
+        assert "이름" in result.content
+        assert "홍길동" in result.content
+        assert "|" in result.content
+
+
+class TestRowsToMarkdown:
+    def test_converts_rows_to_markdown_table(self):
+        from koclaw.core.file_parser import _rows_to_markdown
+
+        rows = [["이름", "나이"], ["홍길동", "30"]]
+        result = _rows_to_markdown(rows)
+
+        assert "| 이름 | 나이 |" in result
+        assert "| 홍길동 | 30 |" in result
+        assert "| --- | --- |" in result
+
+    def test_empty_rows_returns_empty_string(self):
+        from koclaw.core.file_parser import _rows_to_markdown
+
+        assert _rows_to_markdown([]) == ""
+
+    def test_short_rows_padded_to_header_width(self):
+        from koclaw.core.file_parser import _rows_to_markdown
+
+        rows = [["A", "B", "C"], ["x"]]  # 데이터 행이 짧음
+        result = _rows_to_markdown(rows)
+
+        assert "| x |  |  |" in result
 
 
 class TestFileParserUnsupported:

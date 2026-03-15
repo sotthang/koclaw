@@ -217,9 +217,10 @@ class DiscordChannel:
             return
         # 최종 스크린샷만 전송
         try:
-            await channel.send(
-                file=discord.File(io.BytesIO(screenshots[-1]), filename="screenshot.png")
-            )
+            img_bytes = screenshots[-1]
+            is_jpeg = img_bytes[:3] == b"\xff\xd8\xff"
+            filename = "screenshot.jpg" if is_jpeg else "screenshot.png"
+            await channel.send(file=discord.File(io.BytesIO(img_bytes), filename=filename))
         except Exception as e:
             logger.error("[screenshot] Discord 업로드 실패: %s", e)
 

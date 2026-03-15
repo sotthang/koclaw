@@ -249,11 +249,13 @@ class SlackChannel:
             return
         # 최종 스크린샷만 전송 (중간 상태 제외)
         try:
+            img_bytes = screenshots[-1]
+            is_jpeg = img_bytes[:3] == b"\xff\xd8\xff"
             kwargs: dict = {
                 "channel": channel,
-                "content": screenshots[-1],
-                "filename": "screenshot.png",
-                "filetype": "png",
+                "content": img_bytes,
+                "filename": "screenshot.jpg" if is_jpeg else "screenshot.png",
+                "filetype": "jpg" if is_jpeg else "png",
             }
             if thread_ts:
                 kwargs["thread_ts"] = thread_ts

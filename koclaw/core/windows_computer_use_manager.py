@@ -27,13 +27,16 @@ class WindowsComputerUseManager:
     - Docker 없이 동작
     """
 
-    def __init__(self, url: str, api_key: str = ""):
+    def __init__(self, url: str, api_key: str = "", view_url: str = ""):
         """
         Args:
-            url: windows_agent/server.py 주소 (예: http://localhost:7777)
+            url: windows_agent/server.py 주소 (예: http://172.x.x.x:7777, WSL 내부 접근용)
             api_key: WINDOWS_AGENT_API_KEY 값 (미설정 시 인증 생략)
+            view_url: 브라우저 공개 주소 (예: http://100.x.x.x:7777, Tailscale 등)
+                      미설정 시 url을 그대로 사용
         """
         self._url = url.rstrip("/")
+        self._view_url = view_url.rstrip("/") if view_url else self._url
         self._headers = {"X-API-Key": api_key} if api_key else {}
         self._screenshots: dict[str, list[bytes]] = {}
         self._files: dict[str, list[tuple[str, bytes]]] = {}
@@ -204,7 +207,7 @@ class WindowsComputerUseManager:
         """Docker 방식과의 호환성을 위한 no-op."""
 
     def stream_url(self) -> str:
-        return f"{self._url}/stream"
+        return f"{self._view_url}/stream"
 
     def view_url(self) -> str:
-        return f"{self._url}/view"
+        return f"{self._view_url}/view"

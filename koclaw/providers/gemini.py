@@ -109,7 +109,7 @@ class GeminiProvider(LLMProvider):
                         types.Part(
                             inline_data=types.Blob(
                                 data=base64.b64decode(msg["content"]),
-                                mime_type="image/png",
+                                mime_type=msg.get("_mime_type", "image/png"),
                             )
                         )
                     )

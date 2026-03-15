@@ -52,7 +52,9 @@ class OpenAIProvider(LLMProvider):
                     tool_content = [
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{msg['content']}"},
+                            "image_url": {
+                                "url": f"data:{msg.get('_mime_type', 'image/png')};base64,{msg['content']}"
+                            },
                         }
                     ]
                 else:

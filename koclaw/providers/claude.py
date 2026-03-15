@@ -49,7 +49,7 @@ class ClaudeProvider(LLMProvider):
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": "image/png",
+                                "media_type": msg.get("_mime_type", "image/png"),
                                 "data": msg["content"],
                             },
                         }

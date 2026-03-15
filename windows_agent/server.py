@@ -93,12 +93,19 @@ class ReadFileRequest(BaseModel):
 # ── 헬퍼 ────────────────────────────────────────────────
 
 
-def _take_screenshot_png() -> tuple[bytes, int, int]:
+_SCREENSHOT_MAX_WIDTH = 1280  # LLM 전송용 최대 가로 픽셀
+
+
+def _take_screenshot_for_llm() -> tuple[bytes, int, int]:
+    """LLM 전송용 스크린샷 — JPEG로 압축 + 필요 시 리사이즈."""
     img = pyautogui.screenshot()
-    width, height = img.size
+    orig_w, orig_h = img.size
+    if orig_w > _SCREENSHOT_MAX_WIDTH:
+        ratio = _SCREENSHOT_MAX_WIDTH / orig_w
+        img = img.resize((int(orig_w * ratio), int(orig_h * ratio)))
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue(), width, height
+    img.save(buf, format="JPEG", quality=75)
+    return buf.getvalue(), orig_w, orig_h
 
 
 def _take_screenshot_jpeg(quality: int = 50) -> bytes:
@@ -151,12 +158,13 @@ async def screen_size():
 
 @app.get("/screenshot", dependencies=[Auth])
 async def screenshot():
-    """현재 화면을 캡처해 base64 PNG + 해상도로 반환."""
-    png, width, height = await asyncio.to_thread(_take_screenshot_png)
+    """현재 화면을 캡처해 base64 JPEG(리사이즈) + 원본 해상도로 반환."""
+    jpeg, width, height = await asyncio.to_thread(_take_screenshot_for_llm)
     return {
-        "data": base64.b64encode(png).decode(),
+        "data": base64.b64encode(jpeg).decode(),
         "width": width,
         "height": height,
+        "format": "jpeg",
     }
 
 

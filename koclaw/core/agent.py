@@ -113,11 +113,18 @@ class Agent:
                 and not image_b64.startswith("스크린샷 실패")
                 and not image_b64.startswith("Error")
             )
+            # JPEG base64은 /9j/ 로 시작, PNG는 iVBOR 로 시작
+            mime_type = (
+                ("image/jpeg" if image_b64.startswith("/9j/") else "image/png")
+                if is_screenshot
+                else None
+            )
             return {
                 "role": "tool",
                 "tool_call_id": tool_call.id,
                 "content": image_b64 if is_screenshot else result,
                 "_is_image": is_screenshot,
+                "_mime_type": mime_type,
                 "_screen_size_hint": screen_size_hint,
             }
 

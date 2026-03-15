@@ -63,8 +63,23 @@ _TOOL_ICONS: dict[str, str] = {
 }
 
 
-def _tool_status_text(tool_name: str) -> str:
+def _tool_status_text(tool_name: str, args: dict | None = None) -> str:
     icon = _TOOL_ICONS.get(tool_name, "🔧")
+    if tool_name == "computer_use" and args:
+        action = args.get("action", "")
+        detail = {
+            "screenshot": "스크린샷 찍는 중",
+            "click": f"클릭 중 ({args.get('x')}, {args.get('y')})",
+            "double_click": f"더블클릭 중 ({args.get('x')}, {args.get('y')})",
+            "type": f"입력 중: {str(args.get('text', ''))[:20]}",
+            "key": f"키 입력: {args.get('key_name', '')}",
+            "scroll": f"{'아래로' if args.get('direction') == 'down' else '위로'} 스크롤 중",
+            "open_url": f"URL 열기: {str(args.get('url', ''))[:40]}",
+            "run_command": f"명령 실행: {str(args.get('command', ''))[:30]}",
+            "list_windows": "창 목록 조회 중",
+            "get_screen_size": "화면 크기 조회 중",
+        }.get(action, f"{action} 실행 중")
+        return f"{icon} {detail}..."
     return f"{icon} `{tool_name}` 실행 중..."
 
 
@@ -167,8 +182,8 @@ class DiscordChannel:
             await thinking.edit(content=HELP_TEXT)
             return
 
-        async def progress_callback(tool_name: str) -> None:
-            text = _tool_status_text(tool_name)
+        async def progress_callback(tool_name: str, args: dict | None = None) -> None:
+            text = _tool_status_text(tool_name, args)
             if tool_name == "computer_use" and hasattr(self._cu_manager, "view_url"):
                 text += f"\n🖥️ 화면 보기: {self._cu_manager.view_url()}"
             await thinking.edit(content=text)
@@ -198,13 +213,15 @@ class DiscordChannel:
         import discord
 
         screenshots = self._cu_manager.pop_screenshots(session_id)
-        for i, png_bytes in enumerate(screenshots, start=1):
-            try:
-                await channel.send(
-                    file=discord.File(io.BytesIO(png_bytes), filename=f"screenshot_{i}.png")
-                )
-            except Exception as e:
-                logger.error("[screenshot] Discord 업로드 실패: %s", e)
+        if not screenshots:
+            return
+        # 최종 스크린샷만 전송
+        try:
+            await channel.send(
+                file=discord.File(io.BytesIO(screenshots[-1]), filename="screenshot.png")
+            )
+        except Exception as e:
+            logger.error("[screenshot] Discord 업로드 실패: %s", e)
 
     async def _upload_files(self, channel, session_id: str) -> None:
         if self._cu_manager is None:

@@ -7,8 +7,9 @@ from koclaw.core.llm import LLMProvider, LLMResponse, ToolCall
 from koclaw.core.tool import ToolRegistry
 
 logger = logging.getLogger(__name__)
-MAX_TURNS_DEFAULT = 20
+MAX_TURNS_DEFAULT = 50
 _MAX_SAME_TOOL_CALLS = 5
+_MAX_TOTAL_COMPUTER_USE = 40
 
 
 class Agent:
@@ -19,7 +20,7 @@ class Agent:
         max_turns: int = MAX_TURNS_DEFAULT,
         system_prompt: str | None = None,
         session_id: str | None = None,
-        on_tool_start: Callable[[str], Awaitable[None]] | None = None,
+        on_tool_start: Callable[[str, dict], Awaitable[None]] | None = None,
     ):
         self._provider = provider
         self._tools = tools
@@ -33,6 +34,7 @@ class Agent:
         self.messages.append({"role": "user", "content": user_message})
 
         tool_call_counts: dict[str, int] = {}
+        total_computer_use = 0
 
         for _ in range(self._max_turns):
             messages = self.messages
@@ -50,6 +52,16 @@ class Agent:
 
             # 동일 tool+args 반복 호출 감지 (무한루프 방어)
             for tc in response.tool_calls:
+                if tc.name == "computer_use":
+                    total_computer_use += 1
+                    if total_computer_use > _MAX_TOTAL_COMPUTER_USE:
+                        logger.warning(
+                            "[agent] computer_use exceeded %d calls", _MAX_TOTAL_COMPUTER_USE
+                        )
+                        return (
+                            f"오류: computer_use가 {_MAX_TOTAL_COMPUTER_USE}회를 초과하여 중단합니다. "
+                            "작업을 더 작은 단위로 나눠 요청해주세요."
+                        )
                 # screenshot은 상태 확인용으로 반복 호출이 자연스러우므로 제외
                 if tc.name == "computer_use" and tc.arguments.get("action") == "screenshot":
                     continue
@@ -84,7 +96,7 @@ class Agent:
             logger.info("[tool] %s args=%r", tool_call.name, tool_call.arguments)
             if self._on_tool_start is not None:
                 try:
-                    await self._on_tool_start(tool_call.name)
+                    await self._on_tool_start(tool_call.name, tool_call.arguments)
                 except Exception:
                     pass
             try:

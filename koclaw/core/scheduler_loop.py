@@ -30,10 +30,30 @@ class SchedulerLoop:
         for task in due_tasks:
             try:
                 if self._agent_fn:
+                    await self._notify_fn(
+                        session_id=task["session_id"],
+                        message=f"⏰ [{task['title']}] 시작합니다...",
+                    )
+
+                    task_session_id = task["session_id"]
+
+                    async def _progress_cb(tool_name: str, args: dict | None = None) -> None:
+                        if tool_name == "computer_use":
+                            action = (args or {}).get("action", "")
+                            if action not in ("screenshot",):
+                                try:
+                                    await self._notify_fn(
+                                        session_id=task_session_id,
+                                        message=f"🖥️ {action} 실행 중...",
+                                    )
+                                except Exception:
+                                    pass
+
                     message = await self._agent_fn(
                         session_id=task["session_id"],
                         user_message=f"[스케줄 실행] {task['title']}",
                         files=[],
+                        progress_callback=_progress_cb,
                     )
                 else:
                     message = f"⏰ 알림: {task['title']}"

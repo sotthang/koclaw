@@ -198,10 +198,10 @@ class TestAgentSystemPrompt:
 
 class TestAgentToolStartCallback:
     async def test_on_tool_start_called_with_tool_name(self):
-        """tool 실행 전 on_tool_start 콜백이 tool 이름과 함께 호출된다."""
+        """tool 실행 전 on_tool_start 콜백이 tool 이름과 args와 함께 호출된다."""
         called_with = []
 
-        async def on_tool_start(tool_name: str) -> None:
+        async def on_tool_start(tool_name: str, args: dict) -> None:
             called_with.append(tool_name)
 
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "hi"})
@@ -239,7 +239,7 @@ class TestAgentToolStartCallback:
     async def test_on_tool_start_error_does_not_stop_execution(self):
         """콜백에서 예외가 발생해도 tool 실행은 계속된다."""
 
-        async def failing_callback(tool_name: str) -> None:
+        async def failing_callback(tool_name: str, args: dict) -> None:
             raise RuntimeError("콜백 오류")
 
         tool_call = ToolCall(id="1", name="echo", arguments={"message": "hi"})

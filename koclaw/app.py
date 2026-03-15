@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from collections.abc import Awaitable, Callable, Coroutine
@@ -344,7 +345,15 @@ def create_agent_fn(
                 elif text_contexts:
                     full_message = "\n\n".join(text_contexts) + "\n\n" + user_message
 
-        response = response_formatter(await agent.run(full_message))
+        has_computer_use = session_tools.get("computer_use") is not None
+        try:
+            if has_computer_use:
+                raw = await asyncio.wait_for(agent.run(full_message), timeout=600)
+            else:
+                raw = await agent.run(full_message)
+        except asyncio.TimeoutError:
+            raw = "⏱️ 작업이 10분을 초과하여 중단되었습니다. 더 간단한 요청으로 나눠 시도해주세요."
+        response = response_formatter(raw)
 
         if workspace is not None:
             cleanup_instant(workspace, session_id)

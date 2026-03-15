@@ -50,7 +50,10 @@ async def main():
     computer_use_manager: ComputerUseManager | WindowsComputerUseManager | None = None
     windows_agent_url = env.get("WINDOWS_AGENT_URL", "").strip()
     if windows_agent_url:
-        computer_use_manager = WindowsComputerUseManager(url=windows_agent_url)
+        windows_agent_api_key = env.get("WINDOWS_AGENT_API_KEY", "").strip()
+        computer_use_manager = WindowsComputerUseManager(
+            url=windows_agent_url, api_key=windows_agent_api_key
+        )
         tools.register(ComputerUseTool(manager=computer_use_manager))
         logger.info("🖥️  Windows Agent 감지됨 — computer_use 활성화 (%s)", windows_agent_url)
     elif shutil.which("docker"):

@@ -93,18 +93,32 @@ class Agent:
             except Exception as e:
                 logger.error("[tool] %s error: %s", tool_call.name, e)
                 result = f"Error: {e}"
+            # screenshot 결과에 "[화면 크기: WxH]\n" prefix가 붙을 수 있음
+            # LLM에는 순수 base64만 전달하고, 해상도 정보는 별도 보존
+            image_b64 = result
+            screen_size_hint = ""
+            if (
+                tool_call.name == "computer_use"
+                and tool_call.arguments.get("action") == "screenshot"
+                and isinstance(result, str)
+                and result.startswith("[화면 크기:")
+                and "\n" in result
+            ):
+                screen_size_hint, image_b64 = result.split("\n", 1)
+
             is_screenshot = (
                 tool_call.name == "computer_use"
                 and tool_call.arguments.get("action") == "screenshot"
                 and isinstance(result, str)
-                and not result.startswith("스크린샷 실패")
-                and not result.startswith("Error")
+                and not image_b64.startswith("스크린샷 실패")
+                and not image_b64.startswith("Error")
             )
             return {
                 "role": "tool",
                 "tool_call_id": tool_call.id,
-                "content": result,
+                "content": image_b64 if is_screenshot else result,
                 "_is_image": is_screenshot,
+                "_screen_size_hint": screen_size_hint,
             }
 
         # computer_use는 클릭→타이핑→키입력 순서가 중요하므로 순차 실행

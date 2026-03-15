@@ -110,12 +110,39 @@ foreach ($pkg in $packages) {
 
 Write-Host "      Packages installed" -ForegroundColor Green
 
-# ── [4/4] Create start script ────────────────────────────
+# ── [4/5] Generate API key & .env ───────────────────────
 
-Write-Host "[4/4] Creating start.ps1..." -ForegroundColor Yellow
+Write-Host "[4/5] Generating API key..." -ForegroundColor Yellow
+
+$envFile = Join-Path $PSScriptRoot ".env"
+$apiKey  = ""
+
+if (Test-Path $envFile) {
+    $existing = Get-Content $envFile | Where-Object { $_ -match "^WINDOWS_AGENT_API_KEY=" }
+    if ($existing) {
+        $apiKey = ($existing -split "=", 2)[1].Trim()
+        Write-Host "      Existing API key found — reusing" -ForegroundColor DarkGray
+    }
+}
+
+if (-not $apiKey) {
+    # 32자리 랜덤 hex 키 생성
+    $bytes  = New-Object byte[] 16
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $apiKey = ($bytes | ForEach-Object { $_.ToString("x2") }) -join ""
+    Add-Content -Path $envFile -Value "WINDOWS_AGENT_API_KEY=$apiKey" -Encoding UTF8
+    Write-Host "      API key generated and saved to .env" -ForegroundColor Green
+}
+
+Write-Host "      API Key: $apiKey" -ForegroundColor Cyan
+
+# ── [5/5] Create start script ────────────────────────────
+
+Write-Host "[5/5] Creating start.ps1..." -ForegroundColor Yellow
 
 $startScript  = Join-Path $PSScriptRoot "start.ps1"
 $serverScript = Join-Path $PSScriptRoot "server.py"
+$envFilePath  = Join-Path $PSScriptRoot ".env"
 
 $startContent = @"
 # koclaw Windows Agent
@@ -124,6 +151,16 @@ chcp 65001 | Out-Null
 
 `$pythonExe   = Join-Path `$PSScriptRoot ".venv\Scripts\python.exe"
 `$serverScript = Join-Path `$PSScriptRoot "server.py"
+`$envFile      = Join-Path `$PSScriptRoot ".env"
+
+# .env 파일에서 환경변수 로드
+if (Test-Path `$envFile) {
+    Get-Content `$envFile | ForEach-Object {
+        if (`$_ -match "^([^#][^=]*)=(.*)$") {
+            [System.Environment]::SetEnvironmentVariable(`$Matches[1].Trim(), `$Matches[2].Trim(), "Process")
+        }
+    }
+}
 
 Write-Host ""
 Write-Host "koclaw Windows Agent starting..." -ForegroundColor Cyan
@@ -138,6 +175,39 @@ Write-Host ""
 Set-Content -Path $startScript -Value $startContent -Encoding UTF8
 Write-Host "      start.ps1 created" -ForegroundColor Green
 
+# ── Autostart (optional) ─────────────────────────────────
+
+Write-Host ""
+$autoAnswer = Read-Host "Register autostart on Windows login? (y/N)"
+if ($autoAnswer -match "^[yY]") {
+    $taskName   = "koclaw-windows-agent"
+    $psExe      = "powershell.exe"
+    $psArgs     = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`""
+    $action     = New-ScheduledTaskAction -Execute $psExe -Argument $psArgs
+    $trigger    = New-ScheduledTaskTrigger -AtLogOn
+    $settings   = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 0) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+    try {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Limited -Force | Out-Null
+        Write-Host "      Autostart registered: $taskName" -ForegroundColor Green
+    } catch {
+        Write-Host "      Autostart failed (try running as Administrator): $_" -ForegroundColor Red
+    }
+
+    # WSL koclaw 자동 시작
+    $wslTask    = "koclaw-bot"
+    $wslArgs    = "-e bash -lc 'cd ~/koclaw && ./start.sh >> ~/koclaw/koclaw.log 2>&1 &'"
+    $wslAction  = New-ScheduledTaskAction -Execute "wsl.exe" -Argument $wslArgs
+    $wslTrigger = New-ScheduledTaskTrigger -AtLogOn
+    try {
+        Unregister-ScheduledTask -TaskName $wslTask -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $wslTask -Action $wslAction -Trigger $wslTrigger -Settings $settings -RunLevel Limited -Force | Out-Null
+        Write-Host "      Autostart registered: $wslTask (WSL koclaw)" -ForegroundColor Green
+    } catch {
+        Write-Host "      WSL autostart failed: $_" -ForegroundColor Red
+    }
+}
+
 # ── Done ─────────────────────────────────────────────────
 
 Write-Host ""
@@ -151,10 +221,11 @@ Write-Host "  1. Start the agent:" -ForegroundColor White
 Write-Host "     powershell -ExecutionPolicy Bypass -File start.ps1" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  2. Check Windows IP from WSL:" -ForegroundColor White
-Write-Host "     cat /etc/resolv.conf | grep nameserver" -ForegroundColor Cyan
+Write-Host "     ip route | grep default | awk '{print `$3}'" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  3. Add to koclaw .env (WSL):" -ForegroundColor White
-Write-Host "     WINDOWS_AGENT_URL=http://<IP from step 2>:7777" -ForegroundColor Cyan
+Write-Host "     WINDOWS_AGENT_URL=http://<IP>:7777" -ForegroundColor Cyan
+Write-Host "     WINDOWS_AGENT_API_KEY=$apiKey" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  4. Watch screen in browser:" -ForegroundColor White
 Write-Host "     http://localhost:7777/view" -ForegroundColor Cyan

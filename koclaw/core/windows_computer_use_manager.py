@@ -17,7 +17,6 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 30.0
-_COMMAND_TIMEOUT = 120.0
 
 
 class WindowsComputerUseManager:
@@ -28,12 +27,14 @@ class WindowsComputerUseManager:
     - Docker 없이 동작
     """
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, api_key: str = ""):
         """
         Args:
             url: windows_agent/server.py 주소 (예: http://localhost:7777)
+            api_key: WINDOWS_AGENT_API_KEY 값 (미설정 시 인증 생략)
         """
         self._url = url.rstrip("/")
+        self._headers = {"X-API-Key": api_key} if api_key else {}
         self._screenshots: dict[str, list[bytes]] = {}
         self._files: dict[str, list[tuple[str, bytes]]] = {}
 
@@ -41,13 +42,15 @@ class WindowsComputerUseManager:
 
     async def _get(self, path: str, timeout: float = _DEFAULT_TIMEOUT) -> dict:
         async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{self._url}{path}", timeout=timeout)
+            resp = await client.get(f"{self._url}{path}", headers=self._headers, timeout=timeout)
             resp.raise_for_status()
             return resp.json()
 
     async def _post(self, path: str, body: dict, timeout: float = _DEFAULT_TIMEOUT) -> dict:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(f"{self._url}{path}", json=body, timeout=timeout)
+            resp = await client.post(
+                f"{self._url}{path}", json=body, headers=self._headers, timeout=timeout
+            )
             resp.raise_for_status()
             return resp.json()
 
@@ -55,6 +58,14 @@ class WindowsComputerUseManager:
 
     async def restore_containers(self) -> None:
         """Docker 방식과의 호환성을 위한 no-op."""
+
+    async def get_screen_size(self, session_id: str) -> str:
+        """화면 해상도를 반환한다."""
+        try:
+            data = await self._get("/screen_size")
+        except httpx.HTTPError as e:
+            return f"해상도 조회 실패: {e}"
+        return f"화면 크기: {data['width']}x{data['height']} px"
 
     async def screenshot(self, session_id: str) -> str:
         """스크린샷을 찍고 base64 PNG로 반환. PNG bytes를 내부에 누적 저장."""
@@ -65,6 +76,10 @@ class WindowsComputerUseManager:
 
         b64 = data["data"]
         self._screenshots.setdefault(session_id, []).append(base64.b64decode(b64))
+        width = data.get("width", 0)
+        height = data.get("height", 0)
+        if width and height:
+            return f"[화면 크기: {width}x{height}]\n{b64}"
         return b64
 
     def pop_screenshots(self, session_id: str) -> list[bytes]:
@@ -78,10 +93,30 @@ class WindowsComputerUseManager:
     async def click(self, session_id: str, x: int, y: int, button: int = 1) -> str:
         """지정 좌표를 마우스 클릭."""
         try:
-            await self._post("/click", {"x": x, "y": y, "button": button})
+            await self._post("/click", {"x": x, "y": y, "button": button, "double": False})
         except httpx.HTTPError as e:
             return f"클릭 실패: {e}"
         return f"✅ ({x}, {y}) 클릭 완료"
+
+    async def double_click(self, session_id: str, x: int, y: int) -> str:
+        """지정 좌표를 더블클릭."""
+        try:
+            await self._post("/click", {"x": x, "y": y, "button": 1, "double": True})
+        except httpx.HTTPError as e:
+            return f"더블클릭 실패: {e}"
+        return f"✅ ({x}, {y}) 더블클릭 완료"
+
+    async def drag(
+        self, session_id: str, x1: int, y1: int, x2: int, y2: int, duration: float = 0.3
+    ) -> str:
+        """마우스 드래그."""
+        try:
+            await self._post(
+                "/drag", {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": duration}
+            )
+        except httpx.HTTPError as e:
+            return f"드래그 실패: {e}"
+        return f"✅ ({x1}, {y1}) → ({x2}, {y2}) 드래그 완료"
 
     async def type_text(self, session_id: str, text: str) -> str:
         """텍스트 입력 (클립보드 경유 — 한글 포함 모든 문자 지원)."""
@@ -129,11 +164,7 @@ class WindowsComputerUseManager:
         return f"✅ URL 열기 요청: {url}"
 
     async def copy_from(self, session_id: str, container_path: str) -> str:
-        """Windows 파일을 읽어 채널 업로드 큐에 추가.
-
-        Docker 방식의 container_path 대신 Windows 로컬 경로를 사용합니다.
-        예: C:\\Users\\user\\output.csv  또는  /mnt/c/Users/user/output.csv
-        """
+        """Windows 파일을 읽어 채널 업로드 큐에 추가."""
         try:
             data = await self._post("/read_file", {"path": container_path}, timeout=30.0)
         except httpx.HTTPStatusError as e:
@@ -161,9 +192,7 @@ class WindowsComputerUseManager:
         """Docker 방식과의 호환성을 위한 no-op."""
 
     def stream_url(self) -> str:
-        """실시간 화면 스트림 URL."""
         return f"{self._url}/stream"
 
     def view_url(self) -> str:
-        """브라우저에서 볼 수 있는 실시간 뷰어 URL."""
         return f"{self._url}/view"

@@ -6,6 +6,10 @@ koclaw 봇(WSL/OCI)에서 HTTP로 호출해 실제 Windows 화면을 제어합�
 실행 방법 (Windows PowerShell):
     pip install fastapi uvicorn pyautogui pyperclip pillow
     python server.py
+
+환경변수:
+    WINDOWS_AGENT_API_KEY  API 키 (설정 시 모든 요청에 X-API-Key 헤더 필요)
+    WINDOWS_AGENT_PORT     포트 (기본값: 7777)
 """
 
 from __future__ import annotations
@@ -13,19 +17,35 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import os
 import subprocess
 
 import pyautogui
 import pyperclip
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 # 화면 모서리 이동 시 예외 방지
 pyautogui.FAILSAFE = False
 
-app = FastAPI(title="koclaw Windows Agent", version="1.0.0")
+_API_KEY = os.environ.get("WINDOWS_AGENT_API_KEY", "").strip()
+_PORT = int(os.environ.get("WINDOWS_AGENT_PORT", "7777"))
+
+app = FastAPI(title="koclaw Windows Agent", version="1.1.0")
+
+
+# ── 인증 ─────────────────────────────────────────────────
+
+
+async def verify_api_key(x_api_key: str = Header(default="")) -> None:
+    """API 키 검증 — WINDOWS_AGENT_API_KEY 미설정 시 인증 생략."""
+    if _API_KEY and x_api_key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+Auth = Depends(verify_api_key)
 
 
 # ── 요청 모델 ─────────────────────────────────────────────
@@ -35,6 +55,7 @@ class ClickRequest(BaseModel):
     x: int
     y: int
     button: int = 1  # 1=왼쪽, 2=가운데, 3=오른쪽
+    double: bool = False
 
 
 class TypeRequest(BaseModel):
@@ -52,6 +73,14 @@ class ScrollRequest(BaseModel):
     amount: int = 3
 
 
+class DragRequest(BaseModel):
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    duration: float = 0.3
+
+
 class CommandRequest(BaseModel):
     command: str
     timeout: float = 60.0
@@ -64,11 +93,12 @@ class ReadFileRequest(BaseModel):
 # ── 헬퍼 ────────────────────────────────────────────────
 
 
-def _take_screenshot_png() -> bytes:
+def _take_screenshot_png() -> tuple[bytes, int, int]:
     img = pyautogui.screenshot()
+    width, height = img.size
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return buf.getvalue()
+    return buf.getvalue(), width, height
 
 
 def _take_screenshot_jpeg(quality: int = 50) -> bytes:
@@ -112,22 +142,41 @@ async def health():
     return {"status": "ok"}
 
 
-@app.get("/screenshot")
+@app.get("/screen_size", dependencies=[Auth])
+async def screen_size():
+    """화면 해상도 반환."""
+    width, height = await asyncio.to_thread(pyautogui.size)
+    return {"width": width, "height": height}
+
+
+@app.get("/screenshot", dependencies=[Auth])
 async def screenshot():
-    """현재 화면을 캡처해 base64 PNG로 반환."""
-    png = await asyncio.to_thread(_take_screenshot_png)
-    return {"data": base64.b64encode(png).decode()}
+    """현재 화면을 캡처해 base64 PNG + 해상도로 반환."""
+    png, width, height = await asyncio.to_thread(_take_screenshot_png)
+    return {
+        "data": base64.b64encode(png).decode(),
+        "width": width,
+        "height": height,
+    }
 
 
-@app.post("/click")
+@app.post("/click", dependencies=[Auth])
 async def click(req: ClickRequest):
-    """지정 좌표 마우스 클릭."""
+    """지정 좌표 마우스 클릭 (더블클릭 지원)."""
     btn = _map_button(req.button)
-    await asyncio.to_thread(pyautogui.click, req.x, req.y, button=btn)
-    return {"ok": True}
+
+    def _do():
+        if req.double:
+            pyautogui.doubleClick(req.x, req.y, button=btn)
+        else:
+            pyautogui.click(req.x, req.y, button=btn)
+
+    await asyncio.to_thread(_do)
+    action = "더블클릭" if req.double else "클릭"
+    return {"ok": True, "action": action}
 
 
-@app.post("/type")
+@app.post("/type", dependencies=[Auth])
 async def type_text(req: TypeRequest):
     """텍스트 입력 — 클립보드 경유로 한글 포함 모든 문자 지원."""
 
@@ -139,7 +188,7 @@ async def type_text(req: TypeRequest):
     return {"ok": True}
 
 
-@app.post("/key")
+@app.post("/key", dependencies=[Auth])
 async def key(req: KeyRequest):
     """키 입력 (예: Return, ctrl+c, ctrl+l)."""
     parts = _parse_key(req.key_name)
@@ -154,7 +203,7 @@ async def key(req: KeyRequest):
     return {"ok": True}
 
 
-@app.post("/scroll")
+@app.post("/scroll", dependencies=[Auth])
 async def scroll(req: ScrollRequest):
     """스크롤 — direction: 'up' | 'down'."""
     clicks = -req.amount if req.direction == "down" else req.amount
@@ -162,7 +211,21 @@ async def scroll(req: ScrollRequest):
     return {"ok": True}
 
 
-@app.post("/command")
+@app.post("/drag", dependencies=[Auth])
+async def drag(req: DragRequest):
+    """마우스 드래그."""
+    await asyncio.to_thread(
+        pyautogui.drag,
+        req.x2 - req.x1,
+        req.y2 - req.y1,
+        duration=req.duration,
+        startX=req.x1,
+        startY=req.y1,
+    )
+    return {"ok": True}
+
+
+@app.post("/command", dependencies=[Auth])
 async def command(req: CommandRequest):
     """PowerShell 명령 실행 후 stdout+stderr 반환."""
 
@@ -189,7 +252,7 @@ async def command(req: CommandRequest):
     return {"output": output}
 
 
-@app.post("/read_file")
+@app.post("/read_file", dependencies=[Auth])
 async def read_file(req: ReadFileRequest):
     """Windows 파일을 읽어 base64로 반환 (copy_from 용도)."""
     from pathlib import Path
@@ -207,7 +270,7 @@ async def read_file(req: ReadFileRequest):
 
 @app.get("/stream")
 async def stream():
-    """MJPEG 스트림 — 브라우저에서 실시간 화면 시청."""
+    """MJPEG 스트림 — 브라우저에서 실시간 화면 시청 (인증 불필요)."""
 
     async def generate():
         while True:
@@ -223,7 +286,7 @@ async def stream():
 
 @app.get("/view", response_class=HTMLResponse)
 async def view():
-    """브라우저에서 실시간 화면을 볼 수 있는 간단한 뷰어."""
+    """브라우저에서 실시간 화면을 볼 수 있는 간단한 뷰어 (인증 불필요)."""
     return """<!DOCTYPE html>
 <html>
 <head>
@@ -241,4 +304,4 @@ async def view():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7777)
+    uvicorn.run(app, host="0.0.0.0", port=_PORT)

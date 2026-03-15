@@ -1,0 +1,25 @@
+[
+  {
+    "//": "stdio transport: 로컬 프로세스를 실행해 MCP 서버로 사용",
+    "name": "filesystem",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+  },
+  {
+    "//": "stdio transport: Python 기반 MCP 서버 (uvx 사용)",
+    "name": "fetch",
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["mcp-server-fetch"]
+  },
+  {
+    "//": "sse transport: 이미 실행 중인 HTTP SSE 서버에 연결",
+    "name": "my-server",
+    "transport": "sse",
+    "url": "http://localhost:8080/sse",
+    "headers": {
+      "Authorization": "Bearer your-token-here"
+    }
+  }
+]

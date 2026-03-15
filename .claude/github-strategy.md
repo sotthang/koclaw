@@ -13,6 +13,15 @@
 - PR 제목: `feat: ...`, `fix: ...`, `chore: ...` 형식
 - PR 생성은 Claude가 담당, commit/push는 사용자가 직접
 
+## 커밋 전 필수 확인
+
+```bash
+uv run ruff check .                                          # lint
+uv run pytest tests/ --ignore=tests/test_agent_integration.py  # 단위 테스트
+```
+
+두 명령 모두 통과한 후 커밋하세요.
+
 ## 보안 주의사항
 
 PR 생성 전 diff에서 반드시 확인:
@@ -35,7 +44,7 @@ __pycache__/
 
 ## 릴리즈 전략
 
-- v0.1.0: core + Slack + 기본 tools (MVP)
-- v0.2.0: 파일 파싱 파이프라인
+- v0.1.0: core + Slack + 기본 tools (MVP) ✅
+- v0.2.0: 파일 파싱 파이프라인 ✅
 - v0.3.0: Korean tools (HWP)
 - v1.0.0: 안정화

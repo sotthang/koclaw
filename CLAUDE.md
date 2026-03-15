@@ -101,6 +101,9 @@ uv run pytest tests/ --ignore=tests/test_agent_integration.py
 
 # 전체 테스트 (LLM API 호출 포함, 느림)
 uv run pytest tests/
+
+# lint (커밋 전 필수)
+uv run ruff check .
 ```
 
 - 테스트 파일 위치: `tests/test_{모듈명}.py`
@@ -123,6 +126,7 @@ uv run pytest tests/
 - 브랜치는 반드시 `main`에서 분기
 - PR 하나에 기능 하나 — 여러 기능을 한 PR에 섞지 않음
 - PR 제출 전 단위 테스트 전체 통과 확인
+- PR 제출 전 `uv run ruff check .` 통과 확인
 
 ## 커밋 규칙
 

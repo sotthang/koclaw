@@ -220,7 +220,7 @@ class TestLoadMcpServers:
             patch("mcp.ClientSession", return_value=FakeSessionCtx()),
         ):
             registry = ToolRegistry()
-            manager = await load_mcp_servers(config_file, registry)
+            await load_mcp_servers(config_file, registry)
 
         # good_tool은 등록됨
         assert registry.get("good_tool") is not None

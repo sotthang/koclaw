@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import re
+import tempfile
 from collections.abc import Awaitable, Callable, Coroutine
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from koclaw.core import config as _cfg
 from koclaw.core.agent import Agent
-from koclaw.core.file_parser import FileParser
+from koclaw.core.file_parser import FileParser, ParsedFile
 from koclaw.core.llm import FallbackProvider, LLMProvider
 from koclaw.core.tool import ToolRegistry
 from koclaw.providers.claude import ClaudeProvider
@@ -186,11 +188,6 @@ def _build_system_prompt(
 """
 
 
-_SUMMARIZE_THRESHOLD = 20
-_KEEP_RECENT_MESSAGES = 4
-_MAX_FILE_DOWNLOAD_BYTES = 50 * 1024 * 1024  # 50MB
-
-
 async def _load_memory_section(db: Database, session_id: str, user_id: str | None) -> str | None:
     from koclaw.core.memory_context import parse_memory_context
 
@@ -207,10 +204,10 @@ async def _load_memory_section(db: Database, session_id: str, user_id: str | Non
 
 async def _summarize_if_needed(db: Database, provider: LLMProvider, session_id: str) -> None:
     total = await db.count_messages(session_id)
-    if total <= _SUMMARIZE_THRESHOLD:
+    if total <= _cfg.SUMMARIZE_THRESHOLD:
         return
     all_messages = await db.get_messages(session_id)
-    to_summarize = all_messages[:-_KEEP_RECENT_MESSAGES]
+    to_summarize = all_messages[: -_cfg.KEEP_RECENT_MESSAGES]
     if not to_summarize:
         return
     conversation = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in to_summarize)
@@ -220,7 +217,29 @@ async def _summarize_if_needed(db: Database, provider: LLMProvider, session_id: 
         tools=None,
     )
     await db.save_summary(session_id, response.content)
-    await db.delete_old_messages(session_id, keep_last=_KEEP_RECENT_MESSAGES)
+    await db.delete_old_messages(session_id, keep_last=_cfg.KEEP_RECENT_MESSAGES)
+
+
+async def _fetch_and_parse(
+    f: dict, file_fetcher: FileFetcher, parser: FileParser
+) -> tuple[str, bytes | None, "ParsedFile | str"]:
+    """파일 1개 다운로드 후 파싱.
+
+    Returns:
+        (safe_name, data, parsed)  — 성공
+        (safe_name, None, error_msg)  — 실패
+    """
+    safe_name = Path(f["name"]).name
+    data = await file_fetcher(f["url"])
+    if len(data) > _cfg.MAX_FILE_DOWNLOAD_BYTES:
+        max_mb = _cfg.MAX_FILE_DOWNLOAD_BYTES // 1024 // 1024
+        return safe_name, None, f"파일이 너무 큽니다, 최대 {max_mb}MB"
+    with tempfile.NamedTemporaryFile(suffix=Path(f["name"]).suffix, delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+    parsed = await parser.parse(tmp_path)
+    parsed.name = safe_name
+    return safe_name, data, parsed
 
 
 def create_agent_fn(
@@ -268,38 +287,25 @@ def create_agent_fn(
             agent.messages.append({"role": "assistant", "content": f"[이전 대화 요약]\n{summary}"})
         agent.messages += [{"role": m["role"], "content": m["content"]} for m in history]
 
-        full_message = user_message
+        full_message: str | list = user_message
         if files and file_fetcher:
             if workspace is not None:
                 session_dir = Path(workspace) / session_id.replace(":", "_")
                 session_dir.mkdir(parents=True, exist_ok=True)
-                saved_names = []
-                image_parts = []
+                saved_names: list[str] = []
+                image_parts: list[dict] = []
                 for f in files:
-                    data = await file_fetcher(f["url"])
-                    safe_name = Path(f["name"]).name
-                    if len(data) > _MAX_FILE_DOWNLOAD_BYTES:
-                        max_mb = _MAX_FILE_DOWNLOAD_BYTES // 1024 // 1024
-                        saved_names.append(
-                            f"{safe_name} (오류: 파일이 너무 큽니다, 최대 {max_mb}MB)"
-                        )
+                    safe_name, data, result = await _fetch_and_parse(f, file_fetcher, parser)
+                    if data is None:
+                        saved_names.append(f"{safe_name} (오류: {result})")
                         continue
-                    import tempfile
-
-                    with tempfile.NamedTemporaryFile(
-                        suffix=Path(f["name"]).suffix, delete=False
-                    ) as tmp:
-                        tmp.write(data)
-                        tmp_path = tmp.name
-                    parsed = await parser.parse(tmp_path)
-                    parsed.name = safe_name
-                    if parsed.is_image:
-                        image_parts.append(parsed.to_image_part())
+                    assert not isinstance(result, str)
+                    if result.is_image:
+                        image_parts.append(result.to_image_part())
                     else:
-                        dest = session_dir / safe_name
-                        dest.write_bytes(data)
+                        (session_dir / safe_name).write_bytes(data)
                         saved_names.append(safe_name)
-                parts = []
+                parts: list[dict] = []
                 if saved_names:
                     notice = (
                         "다음 파일이 저장되었습니다. file tool(scope=session)로 읽어서 분석하세요:\n"
@@ -313,46 +319,33 @@ def create_agent_fn(
                 elif saved_names:
                     full_message = parts[0]["text"]
             else:
-                import tempfile
-
-                text_contexts = []
+                text_contexts: list[str] = []
                 image_parts = []
                 for f in files:
-                    data = await file_fetcher(f["url"])
-                    safe_name = Path(f["name"]).name
-                    if len(data) > _MAX_FILE_DOWNLOAD_BYTES:
-                        max_mb = _MAX_FILE_DOWNLOAD_BYTES // 1024 // 1024
-                        text_contexts.append(
-                            f"[{safe_name}: 오류 — 파일이 너무 큽니다, 최대 {max_mb}MB]"
-                        )
+                    safe_name, data, result = await _fetch_and_parse(f, file_fetcher, parser)
+                    if data is None:
+                        text_contexts.append(f"[{safe_name}: 오류 — {result}]")
                         continue
-                    with tempfile.NamedTemporaryFile(
-                        suffix=Path(f["name"]).suffix, delete=False
-                    ) as tmp:
-                        tmp.write(data)
-                        tmp_path = tmp.name
-                    parsed = await parser.parse(tmp_path)
-                    parsed.name = safe_name
-                    if parsed.is_image:
-                        image_parts.append(parsed.to_image_part())
+                    assert not isinstance(result, str)
+                    if result.is_image:
+                        image_parts.append(result.to_image_part())
                     else:
-                        text_contexts.append(parsed.to_llm_context())
-
+                        text_contexts.append(result.to_llm_context())
                 if image_parts:
                     prefix = "\n\n".join(text_contexts) + "\n\n" if text_contexts else ""
-                    text = prefix + user_message
-                    full_message = [{"type": "text", "text": text}] + image_parts
+                    full_message = [{"type": "text", "text": prefix + user_message}] + image_parts
                 elif text_contexts:
                     full_message = "\n\n".join(text_contexts) + "\n\n" + user_message
 
         has_computer_use = session_tools.get("computer_use") is not None
+        timeout = (
+            _cfg.AGENT_TIMEOUT_COMPUTER_USE if has_computer_use else _cfg.AGENT_TIMEOUT_DEFAULT
+        )
         try:
-            if has_computer_use:
-                raw = await asyncio.wait_for(agent.run(full_message), timeout=600)
-            else:
-                raw = await agent.run(full_message)
+            raw = await asyncio.wait_for(agent.run(full_message), timeout=timeout)
         except asyncio.TimeoutError:
-            raw = "⏱️ 작업이 10분을 초과하여 중단되었습니다. 더 간단한 요청으로 나눠 시도해주세요."
+            mins = timeout // 60
+            raw = f"⏱️ 작업이 {mins}분을 초과하여 중단되었습니다. 더 간단한 요청으로 나눠 시도해주세요."
         response = response_formatter(raw)
 
         if workspace is not None:

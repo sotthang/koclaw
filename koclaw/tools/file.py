@@ -6,8 +6,6 @@ from koclaw.core.tool import Tool
 
 PARSER_EXTENSIONS = {".pdf", ".docx", ".hwpx"}
 INSTANT_DIR = ".instant"
-_MAX_FILE_SIZE_BYTES = 1024 * 1024  # 1MB
-_MAX_FILE_COUNT = 100
 
 
 def cleanup_instant(workspace: str | Path, session_id: str) -> None:
@@ -60,9 +58,7 @@ class FileTool(Tool):
         self._session_base = Path(workspace) / safe_id
         self._instant_base = Path(workspace) / safe_id / INSTANT_DIR
         self._parent_base: Path | None = (
-            Path(workspace) / parent_session_id.replace(":", "_")
-            if parent_session_id
-            else None
+            Path(workspace) / parent_session_id.replace(":", "_") if parent_session_id else None
         )
 
     def _base(self, scope: str) -> Path:
@@ -118,12 +114,15 @@ class FileTool(Tool):
             return target.read_text(encoding="utf-8", errors="replace")
 
         if action == "write":
-            if len(content.encode("utf-8")) > _MAX_FILE_SIZE_BYTES:
-                return "오류: 파일 크기 제한(1MB) 초과입니다."
+            from koclaw.core import config as _cfg
+
+            if len(content.encode("utf-8")) > _cfg.MAX_FILE_WRITE_BYTES:
+                max_mb = _cfg.MAX_FILE_WRITE_BYTES // 1024 // 1024
+                return f"오류: 파일 크기 제한({max_mb}MB) 초과입니다."
             if not target.exists():
                 existing = sum(1 for f in base.rglob("*") if f.is_file()) if base.exists() else 0
-                if existing >= _MAX_FILE_COUNT:
-                    return f"오류: 파일 개수 제한({_MAX_FILE_COUNT}개) 초과입니다."
+                if existing >= _cfg.MAX_FILE_COUNT:
+                    return f"오류: 파일 개수 제한({_cfg.MAX_FILE_COUNT}개) 초과입니다."
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
             return f"✅ '{path}' 저장 완료."

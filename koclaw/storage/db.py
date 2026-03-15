@@ -53,6 +53,15 @@ class Database:
                 vnc_port     INTEGER NOT NULL,
                 created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE INDEX IF NOT EXISTS idx_messages_session_id
+                ON messages(session_id, created_at ASC);
+
+            CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_run_at
+                ON scheduled_tasks(run_at, notified);
+
+            CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_session_id
+                ON scheduled_tasks(session_id);
         """)
         # 마이그레이션
         for migration in [

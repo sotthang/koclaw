@@ -599,9 +599,9 @@ class TestCreateAgentFn:
 class TestFileDownloadSizeLimit:
     async def test_oversized_file_is_skipped_and_user_notified(self, tmp_path, monkeypatch):
         """파일이 크기 제한 초과 시 처리를 건너뛰고 사용자에게 안내한다."""
-        import koclaw.app as app_module
+        import koclaw.core.config as cfg_module
 
-        monkeypatch.setattr(app_module, "_MAX_FILE_DOWNLOAD_BYTES", 10)
+        monkeypatch.setattr(cfg_module, "MAX_FILE_DOWNLOAD_BYTES", 10)
 
         from koclaw.core.tool import ToolRegistry
         from koclaw.storage.db import Database
@@ -633,9 +633,9 @@ class TestFileDownloadSizeLimit:
 
     async def test_normal_sized_file_is_processed(self, tmp_path, monkeypatch):
         """크기 제한 이하인 파일은 정상 처리된다."""
-        import koclaw.app as app_module
+        import koclaw.core.config as cfg_module
 
-        monkeypatch.setattr(app_module, "_MAX_FILE_DOWNLOAD_BYTES", 1024)
+        monkeypatch.setattr(cfg_module, "MAX_FILE_DOWNLOAD_BYTES", 1024)
 
         from koclaw.core.tool import ToolRegistry
         from koclaw.storage.db import Database

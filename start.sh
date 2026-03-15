@@ -4,6 +4,29 @@ set -e
 # storage 디렉토리가 없으면 생성
 mkdir -p storage/workspace
 
+# ── Windows Agent 자동 시작 ──────────────────────────────
+# WINDOWS_AGENT_URL이 .env에 설정된 경우 Windows Agent를 항상 재시작
+WINDOWS_AGENT_URL=""
+if [ -f .env ]; then
+    WINDOWS_AGENT_URL=$(grep "^WINDOWS_AGENT_URL=" .env | cut -d'=' -f2 | tr -d '\r' | tr -d '"')
+fi
+
+if [ -n "$WINDOWS_AGENT_URL" ]; then
+    echo "🖥️  Windows Agent 재시작 중..."
+    WINDOWS_HOME=$(powershell.exe -NoProfile -Command '$env:USERPROFILE' 2>/dev/null | tr -d '\r\n')
+    START_PS1="${WINDOWS_HOME}\\koclaw-agent\\start.ps1"
+    # 7777 포트 사용 중인 프로세스만 종료
+    powershell.exe -NoProfile -Command "
+        \$conn = Get-NetTCPConnection -LocalPort 7777 -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (\$conn) { Stop-Process -Id \$conn.OwningProcess -Force -ErrorAction SilentlyContinue }
+    " 2>/dev/null || true
+    sleep 1
+    # 새로 시작 (백그라운드, 숨김 창)
+    powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "$START_PS1" &
+    echo "✅ Windows Agent 시작됨"
+fi
+# ────────────────────────────────────────────────────────
+
 # 컨테이너를 현재 사용자 UID/GID로 실행 (볼륨 권한 문제 방지)
 export CURRENT_UID=$(id -u)
 export CURRENT_GID=$(id -g)

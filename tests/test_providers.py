@@ -6,6 +6,7 @@ from koclaw.providers.openai import OpenAIProvider
 
 # ── Claude ──────────────────────────────────────────────────────────────────
 
+
 class TestClaudeProvider:
     def _make_text_response(self, text: str):
         block = MagicMock()
@@ -68,17 +69,17 @@ class TestClaudeProvider:
             provider = ClaudeProvider(api_key="test-key")
             await provider.complete(
                 messages=[{"role": "user", "content": "hi"}],
-                tools=[{
-                    "name": "echo",
-                    "description": "에코",
-                    "parameters": {"type": "object", "properties": {}},
-                }],
+                tools=[
+                    {
+                        "name": "echo",
+                        "description": "에코",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
             )
 
         call_kwargs = mock_client.messages.create.call_args.kwargs
-        assert call_kwargs["tools"][0]["input_schema"] == {
-            "type": "object", "properties": {}
-        }
+        assert call_kwargs["tools"][0]["input_schema"] == {"type": "object", "properties": {}}
 
     async def test_extracts_system_message_as_system_param(self):
         """system 메시지를 messages 배열에서 제거하고 system 파라미터로 전달"""
@@ -90,10 +91,12 @@ class TestClaudeProvider:
             mock_client.messages.create = AsyncMock(return_value=fake_response)
 
             provider = ClaudeProvider(api_key="test-key")
-            await provider.complete([
-                {"role": "system", "content": "당신은 koclaw입니다."},
-                {"role": "user", "content": "안녕"},
-            ])
+            await provider.complete(
+                [
+                    {"role": "system", "content": "당신은 koclaw입니다."},
+                    {"role": "user", "content": "안녕"},
+                ]
+            )
 
         call_kwargs = mock_client.messages.create.call_args.kwargs
         assert call_kwargs.get("system") == "당신은 koclaw입니다."
@@ -102,6 +105,7 @@ class TestClaudeProvider:
     async def test_converts_multimodal_user_message_with_image(self):
         """user 메시지 content가 리스트이면 이미지 파트를 Claude API 형식으로 변환"""
         import base64
+
         fake_response = self._make_text_response("이미지 분석 결과")
 
         with patch("koclaw.providers.claude.anthropic.AsyncAnthropic") as mock_cls:
@@ -110,17 +114,21 @@ class TestClaudeProvider:
             mock_client.messages.create = AsyncMock(return_value=fake_response)
 
             provider = ClaudeProvider(api_key="test-key")
-            await provider.complete([{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "이미지 분석해줘"},
+            await provider.complete(
+                [
                     {
-                        "type": "image",
-                        "data": base64.b64encode(b"fake_image").decode(),
-                        "mime_type": "image/png",
-                    },
-                ],
-            }])
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "이미지 분석해줘"},
+                            {
+                                "type": "image",
+                                "data": base64.b64encode(b"fake_image").decode(),
+                                "mime_type": "image/png",
+                            },
+                        ],
+                    }
+                ]
+            )
 
         call_kwargs = mock_client.messages.create.call_args.kwargs
         user_content = call_kwargs["messages"][0]["content"]
@@ -142,18 +150,25 @@ class TestClaudeProvider:
             mock_client.messages.create = AsyncMock(return_value=fake_response)
 
             provider = ClaudeProvider(api_key="test-key")
-            await provider.complete([
-                {"role": "user", "content": "스케줄 등록해줘"},
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {"id": "tool-1", "name": "scheduler", "arguments": {"action": "add"}, "thought_signature": None}
-                    ],
-                    "_raw_provider_data": None,
-                },
-                {"role": "tool", "tool_call_id": "tool-1", "content": "✅ 등록됨"},
-            ])
+            await provider.complete(
+                [
+                    {"role": "user", "content": "스케줄 등록해줘"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "tool-1",
+                                "name": "scheduler",
+                                "arguments": {"action": "add"},
+                                "thought_signature": None,
+                            }
+                        ],
+                        "_raw_provider_data": None,
+                    },
+                    {"role": "tool", "tool_call_id": "tool-1", "content": "✅ 등록됨"},
+                ]
+            )
 
         call_kwargs = mock_client.messages.create.call_args.kwargs
         messages = call_kwargs["messages"]
@@ -177,6 +192,7 @@ class TestClaudeProvider:
 
 
 # ── OpenAI ───────────────────────────────────────────────────────────────────
+
 
 class TestOpenAIProvider:
     def _make_text_response(self, text: str):
@@ -219,9 +235,8 @@ class TestOpenAIProvider:
 
     async def test_returns_tool_call_response(self):
         import json
-        fake_response = self._make_tool_response(
-            "call-1", "echo", json.dumps({"message": "hello"})
-        )
+
+        fake_response = self._make_tool_response("call-1", "echo", json.dumps({"message": "hello"}))
 
         with patch("koclaw.providers.openai.openai.AsyncOpenAI") as mock_cls:
             mock_client = AsyncMock()
@@ -243,6 +258,7 @@ class TestOpenAIProvider:
             part = MagicMock()
             part.text = "안녕하세요"
             part.function_call = None
+            part.thought = False
             candidate = MagicMock()
             candidate.content.parts = [part]
             fake_response = MagicMock()
@@ -335,15 +351,25 @@ class TestOpenAIProvider:
 
             raw_content = MagicMock()  # 원본 Gemini Content (thought_signature 포함)
             provider = GeminiProvider(api_key="test-key")
-            await provider.complete([
-                {"role": "user", "content": "날씨"},
-                {
-                    "role": "assistant", "content": None,
-                    "tool_calls": [{"id": "1", "name": "search", "arguments": {}, "thought_signature": None}],
-                    "_raw_provider_data": raw_content,
-                },
-                {"role": "tool", "tool_call_id": "1", "content": "맑음"},
-            ])
+            await provider.complete(
+                [
+                    {"role": "user", "content": "날씨"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "1",
+                                "name": "search",
+                                "arguments": {},
+                                "thought_signature": None,
+                            }
+                        ],
+                        "_raw_provider_data": raw_content,
+                    },
+                    {"role": "tool", "tool_call_id": "1", "content": "맑음"},
+                ]
+            )
 
         call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
         contents = call_kwargs["contents"]
@@ -358,6 +384,7 @@ class TestOpenAIProvider:
             part = MagicMock()
             part.text = "응답"
             part.function_call = None
+            part.thought = False
             candidate = MagicMock()
             candidate.content.parts = [part]
             fake_response = MagicMock()
@@ -365,10 +392,12 @@ class TestOpenAIProvider:
             mock_client.aio.models.generate_content = AsyncMock(return_value=fake_response)
 
             provider = GeminiProvider(api_key="test-key")
-            await provider.complete([
-                {"role": "system", "content": "당신은 koclaw입니다."},
-                {"role": "user", "content": "안녕"},
-            ])
+            await provider.complete(
+                [
+                    {"role": "system", "content": "당신은 koclaw입니다."},
+                    {"role": "user", "content": "안녕"},
+                ]
+            )
 
         call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
         config = call_kwargs["config"]
@@ -388,6 +417,7 @@ class TestOpenAIProvider:
             part = MagicMock()
             part.text = "응답"
             part.function_call = None
+            part.thought = False
             candidate = MagicMock()
             candidate.content.parts = [part]
             fake_response = MagicMock()
@@ -395,17 +425,21 @@ class TestOpenAIProvider:
             mock_client.aio.models.generate_content = AsyncMock(return_value=fake_response)
 
             provider = GeminiProvider(api_key="test-key")
-            await provider.complete([{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "이미지 분석해줘"},
+            await provider.complete(
+                [
                     {
-                        "type": "image",
-                        "data": base64.b64encode(b"fake_image").decode(),
-                        "mime_type": "image/png",
-                    },
-                ],
-            }])
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "이미지 분석해줘"},
+                            {
+                                "type": "image",
+                                "data": base64.b64encode(b"fake_image").decode(),
+                                "mime_type": "image/png",
+                            },
+                        ],
+                    }
+                ]
+            )
 
         call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
         user_parts = call_kwargs["contents"][0].parts
@@ -430,6 +464,7 @@ class TestOpenAIProvider:
     async def test_converts_tool_call_history_to_openai_format(self):
         """이전 tool call이 포함된 메시지를 OpenAI API 형식으로 변환"""
         import json
+
         fake_response = self._make_text_response("결과")
 
         with patch("koclaw.providers.openai.openai.AsyncOpenAI") as mock_cls:
@@ -438,18 +473,25 @@ class TestOpenAIProvider:
             mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
 
             provider = OpenAIProvider(api_key="test-key")
-            await provider.complete([
-                {"role": "user", "content": "스케줄 등록해줘"},
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {"id": "tool-1", "name": "scheduler", "arguments": {"action": "add"}, "thought_signature": None}
-                    ],
-                    "_raw_provider_data": None,
-                },
-                {"role": "tool", "tool_call_id": "tool-1", "content": "✅ 등록됨"},
-            ])
+            await provider.complete(
+                [
+                    {"role": "user", "content": "스케줄 등록해줘"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "tool-1",
+                                "name": "scheduler",
+                                "arguments": {"action": "add"},
+                                "thought_signature": None,
+                            }
+                        ],
+                        "_raw_provider_data": None,
+                    },
+                    {"role": "tool", "tool_call_id": "tool-1", "content": "✅ 등록됨"},
+                ]
+            )
 
         call_kwargs = mock_client.chat.completions.create.call_args.kwargs
         messages = call_kwargs["messages"]
@@ -472,6 +514,7 @@ class TestOpenAIProvider:
     async def test_converts_multimodal_user_message_with_image(self):
         """user 메시지 content가 리스트이면 이미지 파트를 OpenAI image_url 형식으로 변환"""
         import base64
+
         fake_response = self._make_text_response("이미지 분석 결과")
 
         with patch("koclaw.providers.openai.openai.AsyncOpenAI") as mock_cls:
@@ -480,17 +523,21 @@ class TestOpenAIProvider:
             mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
 
             provider = OpenAIProvider(api_key="test-key")
-            await provider.complete([{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "이미지 분석해줘"},
+            await provider.complete(
+                [
                     {
-                        "type": "image",
-                        "data": base64.b64encode(b"fake_image").decode(),
-                        "mime_type": "image/png",
-                    },
-                ],
-            }])
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "이미지 분석해줘"},
+                            {
+                                "type": "image",
+                                "data": base64.b64encode(b"fake_image").decode(),
+                                "mime_type": "image/png",
+                            },
+                        ],
+                    }
+                ]
+            )
 
         call_kwargs = mock_client.chat.completions.create.call_args.kwargs
         user_content = call_kwargs["messages"][0]["content"]

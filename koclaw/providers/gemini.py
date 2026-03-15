@@ -39,6 +39,7 @@ class GeminiProvider(LLMProvider):
             model=self._model,
             contents=contents,
             config=types.GenerateContentConfig(**config_kwargs),
+            http_options=types.HttpOptions(timeout=120_000),  # 120초
         )
 
         raw_content = response.candidates[0].content
@@ -121,7 +122,7 @@ class GeminiProvider(LLMProvider):
         tool_calls = []
 
         for part in response.candidates[0].content.parts:
-            if part.text:
+            if part.text and not getattr(part, "thought", False):
                 text_parts.append(part.text)
             if part.function_call:
                 fc = part.function_call

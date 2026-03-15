@@ -41,6 +41,10 @@ HELP_TEXT = """\
   - `첨부한 DOCX를 PDF로 변환해줘` — LibreOffice 문서 변환
 • *이메일 전송* — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
   - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
+• *MCP 서버 연동* — `mcp_servers.json` 에 서버를 등록하면 외부 tool 자동 연결 (Notion, GitHub 등)
+• *멀티 에이전트* — 복잡한 태스크를 전문 서브 에이전트에게 위임하거나 병렬 처리
+  - `ChatGPT, Claude, Gemini 세 개를 각각 동시에 조사해서 비교해줘`
+  - `뉴스 수집과 요약을 별도 에이전트로 나눠서 처리해줘`
 
 *스케줄러*
 • 자연어로 알림을 예약할 수 있습니다
@@ -100,6 +104,7 @@ _TOOL_ICONS: dict[str, str] = {
     "send_email": "📧",
     "scheduler": "📅",
     "file": "📄",
+    "delegate": "🤖",
 }
 
 

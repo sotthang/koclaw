@@ -74,6 +74,17 @@ async def main():
 
     tools.load_installed()
 
+    # MCP 서버 연결 (mcp_servers.json 존재 시)
+    from koclaw.core.mcp_loader import load_mcp_servers
+
+    mcp_config_path = Path(env.get("MCP_SERVERS_CONFIG", "mcp_servers.json"))
+    mcp_manager = await load_mcp_servers(mcp_config_path, tools)
+
+    # DelegateTool은 provider와 완성된 registry가 필요하므로 마지막에 등록
+    from koclaw.tools.delegate import DelegateTool
+
+    tools.register(DelegateTool(provider=provider, registry=tools))
+
     notify_registry: dict[str, Any] = {}
     agent_registry: dict[str, Any] = {}
     runners = []
@@ -146,6 +157,8 @@ async def main():
         if computer_use_manager is not None:
             logger.info("🖥️  computer_use 컨테이너 정리 중...")
             await computer_use_manager.stop_all()
+        if mcp_manager is not None:
+            await mcp_manager.close()
 
 
 if __name__ == "__main__":

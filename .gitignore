@@ -37,6 +37,9 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 
+# MCP 서버 설정 (API 토큰 등 민감 정보 포함 가능)
+mcp_servers.json
+
 # Test
 .pytest_cache/
 .coverage

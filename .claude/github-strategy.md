@@ -37,5 +37,5 @@ __pycache__/
 
 - v0.1.0: core + Slack + 기본 tools (MVP)
 - v0.2.0: 파일 파싱 파이프라인
-- v0.3.0: Korean tools (HWP, 네이버)
+- v0.3.0: Korean tools (HWP)
 - v1.0.0: 안정화

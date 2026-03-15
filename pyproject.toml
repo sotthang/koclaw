@@ -18,6 +18,8 @@ dependencies = [
     "youtube-transcript-api>=0.6.0",
     "pypdf>=4.0.0",
     "feedparser>=6.0.12",
+    "openpyxl>=3.1.0",
+    "python-pptx>=0.6.23",
 ]
 
 [project.optional-dependencies]
@@ -25,11 +27,12 @@ slack   = ["slack-bolt>=1.21.0"]
 youtube = ["youtube-transcript-api>=0.6.0"]
 search  = ["ddgs>=6.0.0"]
 browse  = ["beautifulsoup4>=4.12.0"]
-file    = ["pypdf>=4.0.0", "python-docx>=1.1.0"]
+file    = ["pypdf>=4.0.0", "python-docx>=1.1.0", "openpyxl>=3.1.0", "python-pptx>=0.6.23"]
 korean  = ["pyhwp>=0.1b15", "python-hwpx>=2.0"]
 discord = ["discord.py>=2.0.0"]
 rss     = ["feedparser>=6.0.0"]
 email   = ["aiosmtplib>=3.0.0"]
+mcp     = ["mcp>=1.0.0"]
 all     = [
     "koclaw[slack]",
     "koclaw[youtube]",
@@ -40,6 +43,7 @@ all     = [
     "koclaw[discord]",
     "koclaw[rss]",
     "koclaw[email]",
+    "koclaw[mcp]",
 ]
 [project.entry-points."koclaw.tools"]
 # 설치된 tool이 자동으로 등록됨

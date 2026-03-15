@@ -54,8 +54,11 @@ def test_tool_action_enum(tool):
     schema = tool.schema()
     actions = schema["parameters"]["properties"]["action"]["enum"]
     assert set(actions) == {
+        "get_screen_size",
         "screenshot",
         "click",
+        "double_click",
+        "drag",
         "type",
         "key",
         "open_url",

@@ -96,16 +96,31 @@ class ReadFileRequest(BaseModel):
 _SCREENSHOT_MAX_WIDTH = 1280  # LLM 전송용 최대 가로 픽셀
 
 
-def _take_screenshot_for_llm() -> tuple[bytes, int, int]:
-    """LLM 전송용 스크린샷 — JPEG로 압축 + 필요 시 리사이즈."""
+def _take_screenshot_for_llm() -> tuple[bytes, int, int, int, int]:
+    """LLM 전송용 스크린샷 — JPEG로 압축 + 필요 시 리사이즈.
+
+    Returns:
+        (jpeg_bytes, orig_w, orig_h, img_w, img_h)
+        img_w/img_h: LLM이 실제로 받는 이미지 해상도 (좌표 계산 기준)
+    """
     img = pyautogui.screenshot()
     orig_w, orig_h = img.size
     if orig_w > _SCREENSHOT_MAX_WIDTH:
         ratio = _SCREENSHOT_MAX_WIDTH / orig_w
         img = img.resize((int(orig_w * ratio), int(orig_h * ratio)))
+    img_w, img_h = img.size
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=75)
-    return buf.getvalue(), orig_w, orig_h
+    return buf.getvalue(), orig_w, orig_h, img_w, img_h
+
+
+def _scale_to_screen(x: int, y: int) -> tuple[int, int]:
+    """이미지 좌표(_SCREENSHOT_MAX_WIDTH 기준)를 실제 화면 좌표로 변환."""
+    screen_w, screen_h = pyautogui.size()
+    if screen_w <= _SCREENSHOT_MAX_WIDTH:
+        return x, y
+    scale = screen_w / _SCREENSHOT_MAX_WIDTH
+    return int(x * scale), int(y * scale)
 
 
 def _take_screenshot_jpeg(quality: int = 50) -> bytes:
@@ -158,26 +173,35 @@ async def screen_size():
 
 @app.get("/screenshot", dependencies=[Auth])
 async def screenshot():
-    """현재 화면을 캡처해 base64 JPEG(리사이즈) + 원본 해상도로 반환."""
-    jpeg, width, height = await asyncio.to_thread(_take_screenshot_for_llm)
+    """현재 화면을 캡처해 base64 JPEG(리사이즈) + 이미지 해상도로 반환.
+
+    width/height는 LLM이 실제로 받는 이미지 크기입니다.
+    LLM은 이 해상도 기준으로 좌표를 계산해야 합니다.
+    서버에서 클릭 시 실제 화면 좌표로 자동 변환합니다.
+    """
+    jpeg, orig_w, orig_h, img_w, img_h = await asyncio.to_thread(_take_screenshot_for_llm)
     return {
         "data": base64.b64encode(jpeg).decode(),
-        "width": width,
-        "height": height,
+        "width": img_w,
+        "height": img_h,
         "format": "jpeg",
     }
 
 
 @app.post("/click", dependencies=[Auth])
 async def click(req: ClickRequest):
-    """지정 좌표 마우스 클릭 (더블클릭 지원)."""
+    """지정 좌표 마우스 클릭 (더블클릭 지원).
+
+    이미지 좌표(_SCREENSHOT_MAX_WIDTH 기준)를 실제 화면 좌표로 자동 변환합니다.
+    """
     btn = _map_button(req.button)
+    x, y = _scale_to_screen(req.x, req.y)
 
     def _do():
         if req.double:
-            pyautogui.doubleClick(req.x, req.y, button=btn)
+            pyautogui.doubleClick(x, y, button=btn)
         else:
-            pyautogui.click(req.x, req.y, button=btn)
+            pyautogui.click(x, y, button=btn)
 
     await asyncio.to_thread(_do)
     action = "더블클릭" if req.double else "클릭"
@@ -215,20 +239,23 @@ async def key(req: KeyRequest):
 async def scroll(req: ScrollRequest):
     """스크롤 — direction: 'up' | 'down'."""
     clicks = -req.amount if req.direction == "down" else req.amount
-    await asyncio.to_thread(pyautogui.scroll, clicks, req.x, req.y)
+    x, y = _scale_to_screen(req.x, req.y)
+    await asyncio.to_thread(pyautogui.scroll, clicks, x, y)
     return {"ok": True}
 
 
 @app.post("/drag", dependencies=[Auth])
 async def drag(req: DragRequest):
     """마우스 드래그."""
+    x1, y1 = _scale_to_screen(req.x1, req.y1)
+    x2, y2 = _scale_to_screen(req.x2, req.y2)
     await asyncio.to_thread(
         pyautogui.drag,
-        req.x2 - req.x1,
-        req.y2 - req.y1,
+        x2 - x1,
+        y2 - y1,
         duration=req.duration,
-        startX=req.x1,
-        startY=req.y1,
+        startX=x1,
+        startY=y1,
     )
     return {"ok": True}
 

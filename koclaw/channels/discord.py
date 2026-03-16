@@ -234,10 +234,17 @@ class DiscordChannel:
 
         import discord
 
+        stored = self._cu_manager.pop_screenshots(session_id)
+        if not stored:
+            return
+        # 에이전트 완료 후 최종 상태를 새로 캡처 (마지막 액션 이후 화면 반영)
+        try:
+            await self._cu_manager.screenshot(session_id)
+        except Exception:
+            pass
         screenshots = self._cu_manager.pop_screenshots(session_id)
         if not screenshots:
-            return
-        # 최종 스크린샷만 전송
+            screenshots = stored
         try:
             img_bytes = screenshots[-1]
             is_jpeg = img_bytes[:3] == b"\xff\xd8\xff"

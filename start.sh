@@ -28,7 +28,7 @@ if [ -n "$WINDOWS_AGENT_URL" ]; then
         " 2>/dev/null || true
         sleep 1
         # 새로 시작 (백그라운드, 숨김 창)
-        powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "$START_PS1" &
+        powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "$START_PS1" >/dev/null 2>&1 &
         echo "✅ Windows Agent 시작됨"
     fi
 fi

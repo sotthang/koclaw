@@ -19,6 +19,7 @@ from koclaw.tools.computer_use import ComputerUseTool
 from koclaw.tools.email import EmailTool
 from koclaw.tools.rss import RssFeedTool
 from koclaw.tools.search import SearchTool
+from koclaw.tools.weather import WeatherTool
 from koclaw.tools.youtube import YouTubeTool
 
 load_dotenv()
@@ -46,6 +47,7 @@ async def main():
     tools.register(YouTubeTool())
     tools.register(RssFeedTool())
     tools.register(EmailTool())
+    tools.register(WeatherTool())
 
     computer_use_manager: ComputerUseManager | WindowsComputerUseManager | None = None
     windows_agent_url = env.get("WINDOWS_AGENT_URL", "").strip()

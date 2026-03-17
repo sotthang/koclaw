@@ -17,6 +17,9 @@ HELP_TEXT = """\
 • **RSS 피드** — 뉴스·블로그·GitHub 릴리즈 등 RSS 피드 구독
   - `해커뉴스 최신 글 5개 요약해줘`
   - `https://example.com/feed.xml 읽어줘`
+• **날씨 조회** — 전 세계 도시의 현재 날씨와 최저·최고 기온
+  - `서울 날씨 알려줘`
+  - `도쿄 오늘 날씨 어때?`
 • **YouTube 요약** — 동영상 링크를 보내면 내용을 요약
 • **파일 분석** — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
 • **가상 데스크탑 제어** — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
@@ -65,6 +68,7 @@ _TOOL_ICONS: dict[str, str] = {
     "scheduler": "📅",
     "file": "📄",
     "delegate": "🤖",
+    "weather": "⛅",
 }
 
 

@@ -69,6 +69,16 @@ class SchedulerLoop:
                 logger.exception(
                     "[scheduler] task 실행 실패: id=%s title=%r", task["id"], task["title"]
                 )
+                # 예외가 발생해도 run_at을 갱신해야 다음 tick에서 중복 실행되지 않음
+                try:
+                    if task.get("recurrence"):
+                        await self._db.advance_task_run_at(task["id"], task["recurrence"])
+                    else:
+                        await self._db.mark_task_notified(task["id"])
+                except Exception:
+                    logger.exception(
+                        "[scheduler] run_at 갱신 실패: id=%s", task["id"]
+                    )
 
     async def start(self) -> None:
         self._running = True

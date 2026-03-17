@@ -143,10 +143,16 @@ async def main():
         else:
             logger.warning("알림 라우팅 실패: %s", session_id)
 
-    async def route_agent(session_id: str, user_message: str, files: list) -> str:
+    async def route_agent(
+        session_id: str,
+        user_message: str,
+        files: list,
+        *,
+        progress_callback=None,
+    ) -> str:
         fn = match_registry(agent_registry, session_id)
         if fn:
-            return await fn(session_id, user_message, files)
+            return await fn(session_id, user_message, files, progress_callback=progress_callback)
         return ""
 
     scheduler = SchedulerLoop(db=db, notify_fn=route_notify, agent_fn=route_agent)

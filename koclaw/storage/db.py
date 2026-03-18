@@ -63,6 +63,20 @@ class Database:
 
             CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_session_id
                 ON scheduled_tasks(session_id);
+
+            CREATE TABLE IF NOT EXISTS webhooks (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                token       TEXT    NOT NULL UNIQUE,
+                session_id  TEXT    NOT NULL,
+                description TEXT    NOT NULL,
+                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_webhooks_token
+                ON webhooks(token);
+
+            CREATE INDEX IF NOT EXISTS idx_webhooks_session_id
+                ON webhooks(session_id);
         """)
         # 마이그레이션
         for migration in [
@@ -316,3 +330,30 @@ class Database:
             (session_id, session_id, keep_last),
         )
         await self._conn.commit()
+
+    # ── Webhooks ──────────────────────────────────────────────────────────────
+
+    async def save_webhook(self, session_id: str, token: str, description: str) -> None:
+        await self._conn.execute(
+            "INSERT INTO webhooks (session_id, token, description) VALUES (?, ?, ?)",
+            (session_id, token, description),
+        )
+        await self._conn.commit()
+
+    async def get_webhook_by_token(self, token: str) -> dict | None:
+        rows = await self.fetch_all("SELECT * FROM webhooks WHERE token = ?", (token,))
+        return rows[0] if rows else None
+
+    async def get_webhooks(self, session_id: str) -> list[dict]:
+        return await self.fetch_all(
+            "SELECT * FROM webhooks WHERE session_id = ? ORDER BY created_at ASC",
+            (session_id,),
+        )
+
+    async def delete_webhook(self, session_id: str, token: str) -> bool:
+        cursor = await self._conn.execute(
+            "DELETE FROM webhooks WHERE session_id = ? AND token = ?",
+            (session_id, token),
+        )
+        await self._conn.commit()
+        return cursor.rowcount > 0

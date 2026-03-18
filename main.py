@@ -15,6 +15,7 @@ from koclaw.core.tool import ToolRegistry
 from koclaw.core.windows_computer_use_manager import WindowsComputerUseManager
 from koclaw.storage.db import Database
 from koclaw.tools.browse import BrowseTool
+from koclaw.tools.calendar import CalendarTool
 from koclaw.tools.computer_use import ComputerUseTool
 from koclaw.tools.email import EmailTool
 from koclaw.tools.rss import RssFeedTool
@@ -48,6 +49,7 @@ async def main():
     tools.register(RssFeedTool())
     tools.register(EmailTool())
     tools.register(WeatherTool())
+    tools.register(CalendarTool())
 
     computer_use_manager: ComputerUseManager | WindowsComputerUseManager | None = None
     windows_agent_url = env.get("WINDOWS_AGENT_URL", "").strip()
@@ -157,6 +159,23 @@ async def main():
             return await fn(session_id, user_message, files, progress_callback=progress_callback)
         return ""
 
+    # 웹훅 tool 등록
+    from koclaw.tools.webhook import WebhookTool
+
+    tools.register(WebhookTool(db=db))
+
+    # 웹훅 서버 (WEBHOOK_HOST 설정 시 활성화)
+    from koclaw.core.webhook_server import WebhookServer
+
+    webhook_server: WebhookServer | None = None
+    if env.get("WEBHOOK_HOST"):
+        webhook_port = int(env.get("WEBHOOK_PORT", "8080"))
+        webhook_server = WebhookServer(db=db, notify_fn=route_notify, port=webhook_port)
+        runners.append(webhook_server.start())
+        logger.info("🌐 웹훅 서버 활성화: 포트 %d", webhook_port)
+    else:
+        logger.info("ℹ️  웹훅 서버 비활성화 (WEBHOOK_HOST 미설정)")
+
     scheduler = SchedulerLoop(db=db, notify_fn=route_notify, agent_fn=route_agent)
     logger.info("🤖 koclaw 시작!")
     try:
@@ -167,6 +186,8 @@ async def main():
             await computer_use_manager.stop_all()
         if mcp_manager is not None:
             await mcp_manager.close()
+        if webhook_server is not None:
+            await webhook_server.stop()
 
 
 if __name__ == "__main__":

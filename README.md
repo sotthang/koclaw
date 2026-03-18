@@ -79,6 +79,11 @@ uv run pytest tests/
 | `DISCORD_BOT_TOKEN` | Discord 봇 토큰 | Discord 사용 시 |
 | `WINDOWS_AGENT_URL` | Windows Agent 주소 (예: `http://192.168.1.10:7777`) — 설정 시 실제 Windows 화면 제어 | 선택 |
 | `MCP_SERVERS_CONFIG` | MCP 서버 설정 파일 경로 (기본: `mcp_servers.json`) — 파일 없으면 MCP 비활성화 | 선택 |
+| `WEBHOOK_HOST` | 웹훅 서버 외부 주소 (예: `https://your-host.ts.net`) — 설정 시 웹훅 서버 활성화 | 선택 |
+| `WEBHOOK_PORT` | 웹훅 서버 포트 (기본: `8080`) | 선택 |
+| `CALDAV_URL` | CalDAV 서버 주소 (iCloud: `https://caldav.icloud.com`) | 캘린더 사용 시 |
+| `CALDAV_USERNAME` | CalDAV 계정 (iCloud: Apple ID 이메일) | 캘린더 사용 시 |
+| `CALDAV_PASSWORD` | CalDAV 앱 전용 비밀번호 ([appleid.apple.com](https://appleid.apple.com) → 앱 암호) | 캘린더 사용 시 |
 
 ## 기본 사용법
 
@@ -120,6 +125,41 @@ https://youtu.be/... 이 영상 요약해줘
 ```
 
 > **참고**: 자막(자동 생성 포함)이 없는 영상은 요약이 불가능합니다.
+
+#### 웹훅 수신
+
+외부 서비스(GitHub, CI/CD, 모니터링 등)가 이벤트 발생 시 koclaw로 POST 요청을 보내면 지정한 DM/채널로 알림을 전달합니다. `.env`에 `WEBHOOK_HOST` 설정 시 활성화됩니다.
+
+```text
+GitHub PR 알림 웹훅 등록해줘
+→ URL: https://your-host.ts.net/webhook/abc123
+   이 URL을 GitHub Webhook에 등록하세요.
+
+웹훅 목록 보여줘
+웹훅 삭제해줘
+```
+
+외부 노출 방법: Tailscale Funnel(`tailscale funnel 8080`), 개인 도메인 + 리버스 프록시, ngrok 등
+
+#### 캘린더 (CalDAV)
+
+iCloud 캘린더와 연동하여 일정을 조회·추가·수정·삭제합니다. `.env`에 `CALDAV_URL` / `CALDAV_USERNAME` / `CALDAV_PASSWORD` 설정이 필요합니다.
+
+```text
+연동된 캘린더 목록 보여줘
+이번 주 일정 보여줘
+내일 오후 3시에 팀 미팅 추가해줘
+팀 미팅 강남역 카페로 장소 수정해줘
+팀 미팅 삭제해줘
+```
+
+캘린더 필터링은 메모리로 설정할 수 있습니다.
+
+```text
+캘린더는 "업무"랑 "가족"만 써줘, 기억해줘
+```
+
+> **참고**: 다른 사람이 공유해 준 캘린더(구독 캘린더)는 CalDAV 프로토콜 특성상 조회되지 않습니다.
 
 #### 파일 분석
 
@@ -236,6 +276,8 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `youtube` | YouTube 동영상 자막 기반 내용 요약 |
 | `scheduler` | 알림 스케줄 등록/조회/수정/삭제 (단발/반복) |
 | `memory` | 유저/채널/스레드 범위 장기 기억 저장·조회·삭제 |
+| `webhook` | 외부 서비스 이벤트 수신 — GitHub, CI/CD, 모니터링 등 POST 웹훅을 DM/채널로 전달 (`WEBHOOK_HOST` 필요) |
+| `calendar` | iCloud 캘린더 일정 조회·추가·수정·삭제 — CalDAV 기반 (`CALDAV_URL` / `CALDAV_USERNAME` / `CALDAV_PASSWORD` 필요) |
 | `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
 | `computer_use` | 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 또는 Windows Agent) |
 | `delegate` | 서브 에이전트에게 하위 태스크 위임 / 병렬 처리 (멀티 에이전트) |

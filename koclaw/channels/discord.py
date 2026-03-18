@@ -27,6 +27,14 @@ HELP_TEXT = """\
   - `https://example.com 열고 로그인 버튼 눌러줘`
   - `이 CSV 파일로 matplotlib 차트 그려서 파일로 줘` — 컨테이너 파일 채팅 전송
   - `첨부한 DOCX를 PDF로 변환해줘` — LibreOffice 문서 변환
+• **웹훅** — 외부 서비스(GitHub, CI/CD 등) 이벤트를 DM/채널로 수신 (`.env`에 `WEBHOOK_HOST` 필요)
+  - `GitHub PR 알림 웹훅 등록해줘`
+  - `웹훅 목록 보여줘`
+  - `웹훅 삭제해줘`
+• **캘린더** — iCloud 캘린더 일정 조회·추가·수정·삭제 (`.env`에 `CALDAV_URL` / `CALDAV_USERNAME` / `CALDAV_PASSWORD` 필요)
+  - `이번 주 일정 보여줘`
+  - `내일 오후 3시에 팀 미팅 추가해줘`
+  - `팀 미팅 삭제해줘`
 • **이메일 전송** — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
   - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
 • **MCP 서버 연동** — `mcp_servers.json` 에 서버를 등록하면 외부 tool 자동 연결 (Notion, GitHub 등)
@@ -72,6 +80,8 @@ _TOOL_ICONS: dict[str, str] = {
     "file": "📄",
     "delegate": "🤖",
     "weather": "⛅",
+    "calendar": "🗓️",
+    "webhook": "🔔",
 }
 
 

@@ -22,6 +22,9 @@
 | **도움말 텍스트 (Slack)** | `koclaw/channels/slack.py` → `HELP_TEXT` 상수 |
 | **도움말 텍스트 (Discord)** | `koclaw/channels/discord.py` → `HELP_TEXT` 상수 |
 | DB (SQLite) | `koclaw/storage/db.py` |
+| CalDAV 캘린더 연동 | `koclaw/tools/calendar.py` |
+| 웹훅 수신 서버 | `koclaw/core/webhook_server.py` |
+| 웹훅 tool | `koclaw/tools/webhook.py` |
 | 엔트리포인트 | `main.py` |
 | 의존성 / 플러그인 등록 | `pyproject.toml` |
 | 환경변수 템플릿 | `.env.example` |

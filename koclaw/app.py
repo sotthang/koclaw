@@ -142,6 +142,7 @@ def _build_system_prompt(
   - 명령 실행 중 에러가 나면 출력을 읽고 원인을 파악해 후속 명령으로 스스로 해결하세요
   - screenshot 결과는 채널에 이미지 파일로 자동 업로드됩니다. 응답 텍스트에 마크다운 이미지(![...](...)나 attachment 참조)를 포함하지 마세요
   - screenshot은 작업 완료 후 최종 결과 확인 시에만 1회 찍으세요. 매 액션마다 찍지 마세요
+  - 클릭/스크롤 좌표는 반드시 screenshot 이미지 기준으로 계산하세요. get_screen_size 값이 아닌 이미지에서 보이는 위치를 그대로 사용하세요
   - 웹 검색은 open_url로 검색 URL을 직접 구성하세요. 예: 구글 검색은 open_url(url="https://www.google.com/search?q=검색어") 형태로 사용
   - 브라우저에 텍스트를 입력할 때는 반드시 type 액션으로 타이핑한 후 key(key_name="Return")로 제출하세요
   - 사용자가 첨부한 파일은 컨테이너의 /workspace/ 디렉토리에서 읽기 전용으로 접근 가능 (별도 복사 불필요)
@@ -150,6 +151,15 @@ def _build_system_prompt(
   - LibreOffice 사전 설치: 문서 변환 가능 (예: libreoffice --headless --convert-to pdf /workspace/file.docx --outdir /tmp/)
   - Python 데이터 분석 라이브러리 사전 설치: matplotlib, pandas, openpyxl, pillow
 - 한국어 문서 처리 (HWP 파일 포함)
+- 웹훅 등록·조회·삭제 (webhook tool):
+  - register: 외부 서비스용 웹훅 URL 생성 (GitHub, CI/CD 등)
+  - list: 등록된 웹훅 목록과 URL 확인
+  - delete: 웹훅 삭제 (token 필요 — list로 확인)
+- 캘린더 일정 조회·추가·수정·삭제 (calendar tool):
+  - calendars: 연동된 캘린더 목록 조회
+  - list: 일정 조회 (calendar_names 미지정 시 전체 캘린더 조회)
+  - create / delete / update: 일정 추가·삭제·수정
+  - 사용자가 메모리에 "업무, 가족만 써줘" 같은 캘린더 목록을 저장해 둔 경우, memory tool로 먼저 읽어 calendar_names에 전달하세요
 - 장기 기억 저장/조회 (memory tool):
   - 사용자가 기억을 요청하거나 이전 기억이 필요한 질문을 하면 반드시 memory tool을 먼저 호출하세요
   - 메모리 범위(scope) 규칙:

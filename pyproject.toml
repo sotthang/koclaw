@@ -32,7 +32,8 @@ korean  = ["pyhwp>=0.1b15", "python-hwpx>=2.0"]
 discord = ["discord.py>=2.0.0"]
 rss     = ["feedparser>=6.0.0"]
 email   = ["aiosmtplib>=3.0.0"]
-mcp     = ["mcp>=1.0.0"]
+mcp      = ["mcp>=1.0.0"]
+calendar = ["caldav>=1.3.0", "icalendar>=5.0.0"]
 all     = [
     "koclaw[slack]",
     "koclaw[youtube]",
@@ -44,6 +45,7 @@ all     = [
     "koclaw[rss]",
     "koclaw[email]",
     "koclaw[mcp]",
+    "koclaw[calendar]",
 ]
 [project.entry-points."koclaw.tools"]
 # 설치된 tool이 자동으로 등록됨

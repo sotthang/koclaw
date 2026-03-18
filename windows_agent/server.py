@@ -166,9 +166,12 @@ async def health():
 
 @app.get("/screen_size", dependencies=[Auth])
 async def screen_size():
-    """화면 해상도 반환."""
-    width, height = await asyncio.to_thread(pyautogui.size)
-    return {"width": width, "height": height}
+    """LLM 좌표 계산 기준 해상도 반환 (스크린샷 이미지와 동일한 크기)."""
+    orig_w, orig_h = await asyncio.to_thread(pyautogui.size)
+    if orig_w > _SCREENSHOT_MAX_WIDTH:
+        ratio = _SCREENSHOT_MAX_WIDTH / orig_w
+        return {"width": _SCREENSHOT_MAX_WIDTH, "height": int(orig_h * ratio)}
+    return {"width": orig_w, "height": orig_h}
 
 
 @app.get("/screenshot", dependencies=[Auth])

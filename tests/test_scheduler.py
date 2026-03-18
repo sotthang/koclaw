@@ -1,4 +1,5 @@
 """SchedulerTool 단위 테스트."""
+
 from unittest.mock import AsyncMock
 
 from koclaw.tools.scheduler import SchedulerTool
@@ -11,6 +12,7 @@ def _make_tool() -> tuple[SchedulerTool, AsyncMock]:
     db.save_task = AsyncMock()
     db.get_pending_tasks = AsyncMock(return_value=[])
     db.update_task_run_at = AsyncMock(return_value=True)
+    db.update_task_instruction = AsyncMock(return_value=True)
     db.delete_task = AsyncMock(return_value=True)
     tool = SchedulerTool(db=db, session_id="discord:123")
     return tool, db
@@ -51,7 +53,84 @@ class TestSchedulerTitleSanitization:
     async def test_normal_title_is_saved_as_is(self):
         """일반 제목은 그대로 저장된다."""
         tool, db = _make_tool()
-        result = await tool.execute(action="add", title="매일 AI 뉴스 요약", run_at="2026-03-11 09:00:00")
+        result = await tool.execute(
+            action="add", title="매일 AI 뉴스 요약", run_at="2026-03-11 09:00:00"
+        )
         assert "✅" in result
         saved_title = db.save_task.call_args[0][1]
         assert saved_title == "매일 AI 뉴스 요약"
+
+
+class TestSchedulerInstruction:
+    async def test_add_with_instruction_saves_to_db(self):
+        """add 시 instruction이 db.save_task에 전달된다."""
+        tool, db = _make_tool()
+        await tool.execute(
+            action="add",
+            title="출석체크",
+            run_at="2026-03-11 09:00:00",
+            instruction="출석 페이지 새로고침 후 5초 기다리고 오늘 날짜 버튼 클릭",
+        )
+        assert (
+            db.save_task.call_args.kwargs["instruction"]
+            == "출석 페이지 새로고침 후 5초 기다리고 오늘 날짜 버튼 클릭"
+        )
+
+    async def test_add_without_instruction_saves_none(self):
+        """add 시 instruction 없으면 None이 저장된다."""
+        tool, db = _make_tool()
+        await tool.execute(action="add", title="알림", run_at="2026-03-11 09:00:00")
+        assert db.save_task.call_args.kwargs["instruction"] is None
+
+    async def test_list_shows_instruction_when_present(self):
+        """list 시 instruction이 있으면 목록에 표시된다."""
+        tool, db = _make_tool()
+        db.get_pending_tasks = AsyncMock(
+            return_value=[
+                {
+                    "session_id": "discord:123",
+                    "title": "출석체크",
+                    "run_at": "2026-03-11 09:00:00",
+                    "recurrence": None,
+                    "instruction": "오늘 날짜 버튼 클릭",
+                }
+            ]
+        )
+        result = await tool.execute(action="list")
+        assert "오늘 날짜 버튼 클릭" in result
+
+    async def test_list_without_instruction_has_no_jisi_label(self):
+        """list 시 instruction이 없으면 '지시:' 레이블이 표시되지 않는다."""
+        tool, db = _make_tool()
+        db.get_pending_tasks = AsyncMock(
+            return_value=[
+                {
+                    "session_id": "discord:123",
+                    "title": "알림",
+                    "run_at": "2026-03-11 09:00:00",
+                    "recurrence": None,
+                    "instruction": None,
+                }
+            ]
+        )
+        result = await tool.execute(action="list")
+        assert "지시:" not in result
+
+    async def test_update_instruction_calls_db(self):
+        """update 시 instruction만 제공하면 update_task_instruction이 호출된다."""
+        tool, db = _make_tool()
+        result = await tool.execute(
+            action="update",
+            title="출석체크",
+            instruction="새로운 절차: 버튼을 두 번 클릭",
+        )
+        db.update_task_instruction.assert_called_once()
+        assert "✅" in result
+
+    async def test_update_with_no_fields_returns_error(self):
+        """update 시 run_at과 instruction 모두 없으면 오류 메시지를 반환한다."""
+        tool, db = _make_tool()
+        result = await tool.execute(action="update", title="출석체크")
+        assert "변경할 내용이 없습니다" in result
+        db.update_task_run_at.assert_not_called()
+        db.update_task_instruction.assert_not_called()

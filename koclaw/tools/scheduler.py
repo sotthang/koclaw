@@ -15,7 +15,7 @@ class SchedulerTool(Tool):
             "action": {
                 "type": "string",
                 "enum": ["add", "list", "update", "delete"],
-                "description": "add: 등록, list: 조회, update: 시각 수정, delete: 삭제",
+                "description": "add: 등록, list: 조회, update: 수정, delete: 삭제",
             },
             "title": {
                 "type": "string",
@@ -23,12 +23,16 @@ class SchedulerTool(Tool):
             },
             "run_at": {
                 "type": "string",
-                "description": "실행 시각 (add/update 시 필수, 예: 2026-03-10 09:00:00)",
+                "description": "실행 시각 (add/update 시 선택, 예: 2026-03-10 09:00:00)",
             },
             "recurrence": {
                 "type": "string",
                 "enum": ["hourly", "daily", "weekly", "monthly"],
                 "description": "반복 주기 (add 시 선택, 없으면 단발성): hourly=매시간, daily=매일, weekly=매주, monthly=매월",
+            },
+            "instruction": {
+                "type": "string",
+                "description": "스케줄 실행 시 에이전트에게 전달할 구체적인 지시 내용 (add/update 시 선택). 예: '출석 페이지를 새로고침한 뒤 5초 기다리고 오늘 날짜 버튼을 클릭해줘'",
             },
         },
         "required": ["action"],
@@ -42,7 +46,12 @@ class SchedulerTool(Tool):
     _RECURRENCE_LABEL = {"hourly": "매시간", "daily": "매일", "weekly": "매주", "monthly": "매월"}
 
     async def execute(
-        self, action: str, title: str = "", run_at: str = "", recurrence: str = ""
+        self,
+        action: str,
+        title: str = "",
+        run_at: str = "",
+        recurrence: str = "",
+        instruction: str = "",
     ) -> str:
         if action == "add":
             title = title.replace("\n", " ").replace("\r", " ").strip()
@@ -51,7 +60,11 @@ class SchedulerTool(Tool):
             if not run_at and recurrence:
                 run_at = self._next_run_at(recurrence)
             await self._db.save_task(
-                self._session_id, title, run_at, recurrence=recurrence or None
+                self._session_id,
+                title,
+                run_at,
+                recurrence=recurrence or None,
+                instruction=instruction or None,
             )
             suffix = f" ({self._RECURRENCE_LABEL.get(recurrence, '')} 반복)" if recurrence else ""
             return f"✅ 스케줄이 등록되었습니다: '{title}' ({run_at}){suffix}"
@@ -65,14 +78,24 @@ class SchedulerTool(Tool):
             for t in session_tasks:
                 label = self._RECURRENCE_LABEL.get(t.get("recurrence") or "", "")
                 repeat = f" [{label} 반복]" if label else ""
-                lines.append(f"- {t['title']} ({t['run_at']}){repeat}")
+                instr = f"\n  지시: {t['instruction']}" if t.get("instruction") else ""
+                lines.append(f"- {t['title']} ({t['run_at']}){repeat}{instr}")
             return "📅 스케줄 목록:\n" + "\n".join(lines)
 
         if action == "update":
-            updated = await self._db.update_task_run_at(self._session_id, title, run_at)
+            if not run_at and not instruction:
+                return "변경할 내용이 없습니다. run_at 또는 instruction을 지정해주세요."
+            updated = False
+            if run_at:
+                updated = await self._db.update_task_run_at(self._session_id, title, run_at)
+            if instruction:
+                instr_updated = await self._db.update_task_instruction(
+                    self._session_id, title, instruction
+                )
+                updated = updated or instr_updated
             if not updated:
                 return f"'{title}' 스케줄을 찾을 수 없습니다."
-            return f"✅ '{title}' 스케줄이 {run_at}으로 변경되었습니다."
+            return f"✅ '{title}' 스케줄이 업데이트되었습니다."
 
         if action == "delete":
             deleted = await self._db.delete_task(self._session_id, title)
@@ -94,7 +117,9 @@ class SchedulerTool(Tool):
         elif recurrence == "monthly":
             month = now.month % 12 + 1
             year = now.year + (1 if now.month == 12 else 0)
-            next_run = now.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_run = now.replace(
+                year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0
+            )
         else:
             next_run = now + timedelta(hours=1)
         return next_run.strftime("%Y-%m-%d %H:%M:%S")

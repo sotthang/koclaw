@@ -49,9 +49,14 @@ class SchedulerLoop:
                                 except Exception:
                                     pass
 
+                    instruction = task.get("instruction") or ""
+                    if instruction:
+                        user_message = f"[스케줄 실행] {task['title']}\n\n{instruction}"
+                    else:
+                        user_message = f"[스케줄 실행] {task['title']}"
                     message = await self._agent_fn(
                         session_id=task["session_id"],
-                        user_message=f"[스케줄 실행] {task['title']}",
+                        user_message=user_message,
                         files=[],
                         progress_callback=_progress_cb,
                     )
@@ -76,9 +81,7 @@ class SchedulerLoop:
                     else:
                         await self._db.mark_task_notified(task["id"])
                 except Exception:
-                    logger.exception(
-                        "[scheduler] run_at 갱신 실패: id=%s", task["id"]
-                    )
+                    logger.exception("[scheduler] run_at 갱신 실패: id=%s", task["id"])
 
     async def start(self) -> None:
         self._running = True

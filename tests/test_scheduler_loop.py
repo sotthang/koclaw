@@ -143,6 +143,43 @@ class TestSchedulerLoop:
         call_args = notify_fn.call_args.kwargs
         assert "회의 알림" in call_args["message"]
 
+    async def test_instruction_is_appended_to_user_message(self, tmp_path):
+        """instruction이 있으면 user_message에 title과 instruction이 모두 포함된다."""
+        from koclaw.storage.db import Database
+
+        db = Database(tmp_path / "test.db")
+        await db.initialize()
+        await db.save_task(
+            "ch_001",
+            "출석체크",
+            "2020-01-01 00:00:00",
+            instruction="출석 페이지 새로고침 후 5초 기다리고 오늘 날짜 버튼 클릭",
+        )
+
+        agent_fn = AsyncMock(return_value="완료")
+        loop = SchedulerLoop(db=db, notify_fn=AsyncMock(), agent_fn=agent_fn, interval=0.01)
+        await loop.tick()
+
+        user_message = agent_fn.call_args.kwargs["user_message"]
+        assert "[스케줄 실행]" in user_message
+        assert "출석체크" in user_message
+        assert "출석 페이지 새로고침 후 5초 기다리고 오늘 날짜 버튼 클릭" in user_message
+
+    async def test_no_instruction_does_not_add_extra_newline(self, tmp_path):
+        """instruction 없으면 user_message에 불필요한 줄바꿈이 없다."""
+        from koclaw.storage.db import Database
+
+        db = Database(tmp_path / "test.db")
+        await db.initialize()
+        await db.save_task("ch_001", "알림", "2020-01-01 00:00:00")
+
+        agent_fn = AsyncMock(return_value="완료")
+        loop = SchedulerLoop(db=db, notify_fn=AsyncMock(), agent_fn=agent_fn, interval=0.01)
+        await loop.tick()
+
+        user_message = agent_fn.call_args.kwargs["user_message"]
+        assert user_message == "[스케줄 실행] 알림"
+
     async def test_task_failure_does_not_stop_other_tasks(self, tmp_path):
         """하나의 task 실패가 나머지 task 처리를 막지 않는다"""
         from koclaw.storage.db import Database

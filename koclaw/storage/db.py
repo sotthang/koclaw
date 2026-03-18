@@ -23,13 +23,14 @@ class Database:
             );
 
             CREATE TABLE IF NOT EXISTS scheduled_tasks (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT    NOT NULL,
-                title      TEXT    NOT NULL,
-                run_at     DATETIME NOT NULL,
-                recurrence TEXT    DEFAULT NULL,
-                notified   INTEGER  DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT    NOT NULL,
+                title       TEXT    NOT NULL,
+                run_at      DATETIME NOT NULL,
+                recurrence  TEXT    DEFAULT NULL,
+                instruction TEXT    DEFAULT NULL,
+                notified    INTEGER  DEFAULT 0,
+                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS memories (
@@ -69,6 +70,7 @@ class Database:
             "ALTER TABLE messages ADD COLUMN slack_ts TEXT DEFAULT NULL",
             "UPDATE messages SET session_id = 'slack:' || session_id WHERE session_id NOT LIKE 'slack:%' AND session_id NOT LIKE 'discord:%'",
             "UPDATE scheduled_tasks SET session_id = 'slack:' || session_id WHERE session_id NOT LIKE 'slack:%' AND session_id NOT LIKE 'discord:%'",
+            "ALTER TABLE scheduled_tasks ADD COLUMN instruction TEXT DEFAULT NULL",
         ]:
             try:
                 await self._conn.execute(migration)
@@ -143,11 +145,16 @@ class Database:
     # ── Scheduled Tasks ───────────────────────────────────────────────────
 
     async def save_task(
-        self, session_id: str, title: str, run_at: str, recurrence: str | None = None
+        self,
+        session_id: str,
+        title: str,
+        run_at: str,
+        recurrence: str | None = None,
+        instruction: str | None = None,
     ) -> None:
         await self._conn.execute(
-            "INSERT INTO scheduled_tasks (session_id, title, run_at, recurrence) VALUES (?, ?, ?, ?)",
-            (session_id, title, run_at, recurrence),
+            "INSERT INTO scheduled_tasks (session_id, title, run_at, recurrence, instruction) VALUES (?, ?, ?, ?, ?)",
+            (session_id, title, run_at, recurrence, instruction),
         )
         await self._conn.commit()
 
@@ -165,6 +172,17 @@ class Database:
             (task_id,),
         )
         await self._conn.commit()
+
+    async def update_task_instruction(
+        self, session_id: str, title: str, instruction: str | None
+    ) -> bool:
+        cursor = await self._conn.execute(
+            "UPDATE scheduled_tasks SET instruction = ? "
+            "WHERE session_id = ? AND title = ? AND notified = 0",
+            (instruction, session_id, title),
+        )
+        await self._conn.commit()
+        return cursor.rowcount > 0
 
     async def update_task_run_at(self, session_id: str, title: str, run_at: str) -> bool:
         cursor = await self._conn.execute(

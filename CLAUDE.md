@@ -50,8 +50,10 @@
 
 - [ ] `koclaw/providers/{name}.py` — `LLMProvider` 상속
 - [ ] `tests/test_providers.py` — 해당 provider 테스트 추가
-- [ ] `koclaw/app.py` → `create_provider()` 분기 추가
+- [ ] `koclaw/app.py` → `_make_single_provider()` 분기 추가 및 import
 - [ ] `.env.example` — 필요한 환경변수 추가
+- [ ] `README.md` — 환경변수 표 및 아키텍처 providers 목록 업데이트
+- [ ] `CLAUDE.md` — 핵심 파일 위치 표 업데이트 (해당 시)
 
 ### 새 채널(Discord 등) 추가 시
 

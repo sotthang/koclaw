@@ -12,6 +12,7 @@ from koclaw.core.agent import Agent
 from koclaw.core.file_parser import FileParser, ParsedFile
 from koclaw.core.llm import FallbackProvider, LLMProvider
 from koclaw.core.tool import ToolRegistry
+from koclaw.providers.azure_openai import AzureOpenAIProvider
 from koclaw.providers.claude import ClaudeProvider
 from koclaw.providers.gemini import GeminiProvider
 from koclaw.providers.ollama import OllamaProvider
@@ -70,6 +71,20 @@ def _make_single_provider(name: str, env: dict) -> "LLMProvider | None":
         if model:
             kwargs["model"] = model
         return OpenAIProvider(**kwargs)
+    if (
+        name == "azure_openai"
+        and env.get("AZURE_OPENAI_API_KEY")
+        and env.get("AZURE_OPENAI_ENDPOINT")
+    ):
+        kwargs: dict = {
+            "api_key": env["AZURE_OPENAI_API_KEY"],
+            "endpoint": env["AZURE_OPENAI_ENDPOINT"],
+        }
+        if env.get("AZURE_OPENAI_API_VERSION"):
+            kwargs["api_version"] = env["AZURE_OPENAI_API_VERSION"]
+        if model:
+            kwargs["model"] = model
+        return AzureOpenAIProvider(**kwargs)
     if name == "gemini" and env.get("GEMINI_API_KEY"):
         kwargs = {"api_key": env["GEMINI_API_KEY"]}
         if model:

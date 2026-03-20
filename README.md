@@ -9,7 +9,7 @@
 ## 특징
 
 - **한국어 우선** — 모든 응답이 기본적으로 한국어로 작성되며, HWP 등 한국 문서 포맷을 지원합니다
-- **멀티 LLM 지원** — Claude, GPT, Gemini, Ollama 중 선택 사용, 자동 폴백 지원
+- **멀티 LLM 지원** — Claude, GPT, Azure OpenAI, Gemini, Ollama 중 선택 사용, 자동 폴백 지원
 - **도구 확장** — 웹 검색, YouTube 요약, PDF/Excel/PPTX/HWP 등 문서 분석, GUI 자동화, 스케줄러, 메모리
 - **멀티 에이전트** — 복잡한 태스크를 전문 서브 에이전트에 위임하거나 병렬 처리
 - **MCP 연동** — `mcp_servers.json`에 MCP 서버 등록 시 외부 tool 자동 연결 (Notion, GitHub 등)
@@ -64,14 +64,18 @@ uv run pytest tests/
 
 | 변수 | 설명 | 필수 |
 | --- | --- | --- |
-| `DEFAULT_LLM_PROVIDER` | 기본 LLM (`claude` / `openai` / `gemini` / `ollama`) | ✅ |
+| `DEFAULT_LLM_PROVIDER` | 기본 LLM (`claude` / `openai` / `azure_openai` / `gemini` / `ollama`) | ✅ |
 | `FALLBACK_LLM_PROVIDERS` | 폴백 순서 (예: `claude,gemini`) — 기본 provider 실패 시 순서대로 시도 | 선택 |
 | `CLAUDE_MODEL` | Claude 모델명 (예: `claude-sonnet-4-6`) | 선택 |
-| `OPENAI_MODEL` | OpenAI 모델명 (예: `gpt-5.3`) | 선택 |
+| `OPENAI_MODEL` | OpenAI 모델명 (예: `gpt-5.4`) | 선택 |
+| `AZURE_OPENAI_MODEL` | Azure OpenAI deployment 이름 (예: `gpt-4o`) | 선택 |
 | `GEMINI_MODEL` | Gemini 모델명 (예: `gemini-3-flash-preview`) | 선택 |
 | `OLLAMA_MODEL` | Ollama 모델명 (예: `llama3`, `qwen3:8b`) | 선택 |
 | `ANTHROPIC_API_KEY` | Claude 사용 시 필요 | 조건부 |
 | `OPENAI_API_KEY` | GPT 사용 시 필요 | 조건부 |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI 사용 시 필요 | 조건부 |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI 엔드포인트 (예: `https://your-resource.openai.azure.com`) | 조건부 |
+| `AZURE_OPENAI_API_VERSION` | Azure OpenAI API 버전 (기본: `2025-03-01-preview`) | 선택 |
 | `GEMINI_API_KEY` | Gemini 사용 시 필요 | 조건부 |
 | `OLLAMA_BASE_URL` | Ollama 사용 시 (기본: `http://localhost:11434/v1`) | 조건부 |
 | `SLACK_BOT_TOKEN` | Slack 봇 토큰 (`xoxb-...`) | Slack 사용 시 |
@@ -284,6 +288,21 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | 파일 분석 | PDF, DOCX, HWP, HWPX, Excel(.xlsx), PPTX, 이미지 자동 파싱 (첨부 시 자동) |
 | MCP tool | `mcp_servers.json` 등록 서버의 tool 자동 연결 (Notion, GitHub 등) |
 
+## Azure OpenAI
+
+Azure OpenAI Service를 LLM provider로 사용할 수 있습니다.
+
+```env
+DEFAULT_LLM_PROVIDER=azure_openai
+AZURE_OPENAI_API_KEY=your-azure-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_VERSION=2025-03-01-preview   # 생략 가능
+AZURE_OPENAI_MODEL=gpt-4o                     # Azure에서 배포한 deployment 이름
+```
+
+> Azure Portal → Azure OpenAI 리소스 → 키 및 엔드포인트에서 API 키와 엔드포인트를 확인하세요.
+> `AZURE_OPENAI_MODEL`에는 Azure에서 설정한 **deployment 이름**을 입력합니다 (모델명과 다를 수 있습니다).
+
 ## Ollama (로컬 LLM)
 
 API 비용 없이 로컬에서 LLM을 실행할 수 있습니다.
@@ -330,6 +349,7 @@ koclaw/
 ├── providers/
 │   ├── claude.py          # Anthropic Claude
 │   ├── openai.py          # OpenAI GPT
+│   ├── azure_openai.py    # Azure OpenAI
 │   ├── gemini.py          # Google Gemini
 │   └── ollama.py          # Ollama (로컬)
 ├── tools/

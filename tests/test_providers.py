@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from koclaw.providers.azure_openai import AzureOpenAIProvider
 from koclaw.providers.claude import ClaudeProvider
 from koclaw.providers.gemini import GeminiProvider
 from koclaw.providers.openai import OpenAIProvider
@@ -567,3 +568,82 @@ class TestOpenAIProvider:
             api_key="ollama",
             base_url="http://localhost:11434/v1",
         )
+
+
+# ── Azure OpenAI ─────────────────────────────────────────────────────────────
+
+
+class TestAzureOpenAIProvider:
+    def _make_text_response(self, text: str):
+        message = MagicMock()
+        message.content = text
+        message.tool_calls = None
+        choice = MagicMock()
+        choice.message = message
+        response = MagicMock()
+        response.choices = [choice]
+        return response
+
+    async def test_uses_azure_openai_client(self):
+        fake_response = self._make_text_response("Azure 응답")
+
+        with patch("koclaw.providers.azure_openai.openai.AsyncAzureOpenAI") as mock_cls:
+            mock_client = AsyncMock()
+            mock_cls.return_value = mock_client
+            mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            provider = AzureOpenAIProvider(
+                api_key="test-key",
+                endpoint="https://my-resource.openai.azure.com",
+                api_version="2024-12-01-preview",
+                model="gpt-4o",
+            )
+            result = await provider.complete([{"role": "user", "content": "hi"}])
+
+        mock_cls.assert_called_once_with(
+            api_key="test-key",
+            azure_endpoint="https://my-resource.openai.azure.com",
+            api_version="2024-12-01-preview",
+        )
+        assert result.content == "Azure 응답"
+
+    async def test_default_api_version(self):
+        with patch("koclaw.providers.azure_openai.openai.AsyncAzureOpenAI") as mock_cls:
+            mock_cls.return_value = MagicMock()
+            AzureOpenAIProvider(
+                api_key="key",
+                endpoint="https://my-resource.openai.azure.com",
+            )
+
+        _, kwargs = mock_cls.call_args
+        assert kwargs["api_version"] == "2025-03-01-preview"
+
+    async def test_returns_tool_call_response(self):
+        import json
+
+        tool_call = MagicMock()
+        tool_call.id = "call-1"
+        tool_call.function.name = "web_search"
+        tool_call.function.arguments = json.dumps({"query": "날씨"})
+        message = MagicMock()
+        message.content = None
+        message.tool_calls = [tool_call]
+        choice = MagicMock()
+        choice.message = message
+        fake_response = MagicMock()
+        fake_response.choices = [choice]
+
+        with patch("koclaw.providers.azure_openai.openai.AsyncAzureOpenAI") as mock_cls:
+            mock_client = AsyncMock()
+            mock_cls.return_value = mock_client
+            mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            provider = AzureOpenAIProvider(
+                api_key="key",
+                endpoint="https://my-resource.openai.azure.com",
+            )
+            result = await provider.complete([{"role": "user", "content": "날씨 알려줘"}])
+
+        assert result.has_tool_calls is True
+        assert result.tool_calls[0].name == "web_search"
+        assert result.tool_calls[0].arguments == {"query": "날씨"}

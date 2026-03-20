@@ -395,14 +395,23 @@ _pw_page = None
 
 
 async def _ensure_browser():
-    """Playwright 브라우저가 없으면 시작한다."""
+    """Playwright 브라우저가 없으면 시작한다. Chromium 미설치 시 자동 설치."""
     global _pw_playwright, _pw_browser, _pw_page
     if _pw_page is not None:
         return _pw_page
     from playwright.async_api import async_playwright
 
     _pw_playwright = await async_playwright().start()
-    _pw_browser = await _pw_playwright.chromium.launch(headless=False)
+    try:
+        _pw_browser = await _pw_playwright.chromium.launch(headless=False)
+    except Exception:
+        # Chromium 바이너리 없으면 자동 설치 후 재시도
+        await asyncio.to_thread(
+            subprocess.run,
+            ["playwright", "install", "chromium"],
+            check=True,
+        )
+        _pw_browser = await _pw_playwright.chromium.launch(headless=False)
     _pw_page = await _pw_browser.new_page()
     return _pw_page
 

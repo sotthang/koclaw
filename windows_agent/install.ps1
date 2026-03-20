@@ -115,7 +115,8 @@ $packages = @(
     "pyautogui>=0.9.54",
     "pyperclip>=1.8.2",
     "pillow>=10.0.0",
-    "pydantic>=2.0.0"
+    "pydantic>=2.0.0",
+    "playwright>=1.40.0"
 )
 
 foreach ($pkg in $packages) {
@@ -124,6 +125,12 @@ foreach ($pkg in $packages) {
 }
 
 Write-Host "      Packages installed" -ForegroundColor Green
+
+# Playwright 브라우저 설치 (chromium)
+Write-Host "      Installing Playwright Chromium browser..." -ForegroundColor DarkGray
+$playwrightExe = Join-Path $venvDir "Scripts\playwright.exe"
+& $playwrightExe install chromium | Out-Null
+Write-Host "      Playwright Chromium installed" -ForegroundColor Green
 
 # ── [4/5] Generate API key & .env ───────────────────────
 

@@ -549,6 +549,127 @@ class TestOpenAIProvider:
         expected_url = "data:image/png;base64," + base64.b64encode(b"fake_image").decode()
         assert image_part["image_url"]["url"] == expected_url
 
+    async def test_screenshot_tool_result_injected_as_user_message(self):
+        """스크린샷 tool result를 tool(텍스트) + user(이미지) 메시지로 분리"""
+        import base64
+
+        fake_response = self._make_text_response("화면에 버튼이 보입니다")
+
+        with patch("koclaw.providers.openai.openai.AsyncOpenAI") as mock_cls:
+            mock_client = AsyncMock()
+            mock_cls.return_value = mock_client
+            mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            provider = OpenAIProvider(api_key="test-key")
+            img_b64 = base64.b64encode(b"fake_png").decode()
+            await provider.complete(
+                [
+                    {"role": "user", "content": "화면 캡처해줘"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "tc-1",
+                                "name": "computer_use",
+                                "arguments": {"action": "screenshot"},
+                                "thought_signature": None,
+                            }
+                        ],
+                        "_raw_provider_data": None,
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": "tc-1",
+                        "content": img_b64,
+                        "_is_image": True,
+                        "_mime_type": "image/jpeg",
+                        "_screen_size_hint": "[화면 크기: 1280x720]",
+                    },
+                ]
+            )
+
+        messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+
+        # tool 메시지는 텍스트여야 함
+        tool_msg = messages[2]
+        assert tool_msg["role"] == "tool"
+        assert tool_msg["tool_call_id"] == "tc-1"
+        assert isinstance(tool_msg["content"], str)
+        assert "스크린샷" in tool_msg["content"]
+        assert "[화면 크기: 1280x720]" in tool_msg["content"]
+
+        # 그 다음에 user 메시지로 이미지가 와야 함
+        img_msg = messages[3]
+        assert img_msg["role"] == "user"
+        assert img_msg["content"][0]["type"] == "image_url"
+        expected_url = f"data:image/jpeg;base64,{img_b64}"
+        assert img_msg["content"][0]["image_url"]["url"] == expected_url
+
+    async def test_screenshot_image_injected_after_all_tool_results(self):
+        """여러 tool result 중 마지막에 스크린샷이 있어도 user 메시지가 배치 끝에 삽입됨"""
+        import base64
+
+        fake_response = self._make_text_response("ok")
+
+        with patch("koclaw.providers.openai.openai.AsyncOpenAI") as mock_cls:
+            mock_client = AsyncMock()
+            mock_cls.return_value = mock_client
+            mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            provider = OpenAIProvider(api_key="test-key")
+            img_b64 = base64.b64encode(b"fake_png").decode()
+            await provider.complete(
+                [
+                    {"role": "user", "content": "클릭 후 캡처해줘"},
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "tc-1",
+                                "name": "computer_use",
+                                "arguments": {"action": "click", "x": 100, "y": 200},
+                                "thought_signature": None,
+                            },
+                            {
+                                "id": "tc-2",
+                                "name": "computer_use",
+                                "arguments": {"action": "screenshot"},
+                                "thought_signature": None,
+                            },
+                        ],
+                        "_raw_provider_data": None,
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": "tc-1",
+                        "content": "✅ (100, 200) 클릭 완료",
+                        "_is_image": False,
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": "tc-2",
+                        "content": img_b64,
+                        "_is_image": True,
+                        "_mime_type": "image/jpeg",
+                        "_screen_size_hint": "",
+                    },
+                ]
+            )
+
+        messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+
+        # click tool result
+        assert messages[2]["role"] == "tool"
+        assert messages[2]["content"] == "✅ (100, 200) 클릭 완료"
+        # screenshot tool result (텍스트)
+        assert messages[3]["role"] == "tool"
+        assert isinstance(messages[3]["content"], str)
+        # 이미지 user 메시지가 tool 배치 뒤에 와야 함
+        assert messages[4]["role"] == "user"
+        assert messages[4]["content"][0]["type"] == "image_url"
+
     async def test_ollama_uses_custom_base_url(self):
         fake_response = self._make_text_response("ollama 응답")
 

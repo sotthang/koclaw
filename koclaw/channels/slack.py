@@ -37,6 +37,9 @@ HELP_TEXT = """\
   - `도쿄 오늘 날씨 어때?`
 • *YouTube 요약* — 동영상 링크를 보내면 내용을 요약
 • *파일 분석* — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
+• *브라우저 자동화* — Playwright DOM 기반 웹 제어 (좌표 없이 selector로 클릭·입력) (Windows Agent 필요)
+  - `네이버 열고 로그인 버튼 눌러줘` — text selector 자동 탐지
+  - `이 페이지에서 검색창에 "AI" 입력하고 검색해줘`
 • *가상 데스크탑 제어* — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
   - `네이버에서 AI 뉴스 검색해서 스크린샷 찍어줘`
   - `https://example.com 열고 로그인 버튼 눌러줘`
@@ -113,6 +116,7 @@ _TOOL_ICONS: dict[str, str] = {
     "browse": "🌐",
     "youtube": "🎬",
     "computer_use": "🖥️",
+    "browser": "🧭",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",
@@ -139,6 +143,21 @@ def _tool_status_text(tool_name: str, args: dict | None = None) -> str:
             "run_command": f"명령 실행: {str(args.get('command', ''))[:30]}",
             "list_windows": "창 목록 조회 중",
             "get_screen_size": "화면 크기 조회 중",
+        }.get(action, f"{action} 실행 중")
+        return f"{icon} {detail}..."
+    if tool_name == "browser" and args:
+        action = args.get("action", "")
+        detail = {
+            "navigate": f"URL 이동 중: {str(args.get('url', ''))[:40]}",
+            "screenshot": "브라우저 스크린샷 찍는 중",
+            "click": f"클릭 중: {str(args.get('selector', ''))[:30]}",
+            "type": f"입력 중: {str(args.get('text', ''))[:20]}",
+            "scroll": f"{'아래로' if args.get('direction') == 'down' else '위로'} 스크롤 중",
+            "evaluate": "JavaScript 실행 중",
+            "content": "페이지 내용 추출 중",
+            "wait_for": f"요소 대기 중: {str(args.get('selector', ''))[:30]}",
+            "select": f"선택 중: {str(args.get('selector', ''))[:30]}",
+            "close": "브라우저 닫는 중",
         }.get(action, f"{action} 실행 중")
         return f"{icon} {detail}..."
     return f"{icon} `{tool_name}` 실행 중..."

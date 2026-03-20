@@ -56,13 +56,18 @@ async def main():
     if windows_agent_url:
         windows_agent_api_key = env.get("WINDOWS_AGENT_API_KEY", "").strip()
         windows_agent_view_url = env.get("WINDOWS_AGENT_VIEW_URL", "").strip()
+        from koclaw.tools.browser import BrowserTool
+
         computer_use_manager = WindowsComputerUseManager(
             url=windows_agent_url,
             api_key=windows_agent_api_key,
             view_url=windows_agent_view_url,
         )
         tools.register(ComputerUseTool(manager=computer_use_manager))
-        logger.info("🖥️  Windows Agent 감지됨 — computer_use 활성화 (%s)", windows_agent_url)
+        tools.register(BrowserTool(manager=computer_use_manager))
+        logger.info(
+            "🖥️  Windows Agent 감지됨 — computer_use + browser 활성화 (%s)", windows_agent_url
+        )
     elif shutil.which("docker"):
         host_workspace = Path(os.environ.get("HOST_WORKSPACE_DIR", str(WORKSPACE_DIR)))
         computer_use_manager = ComputerUseManager(

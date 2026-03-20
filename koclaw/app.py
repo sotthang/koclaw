@@ -152,7 +152,17 @@ def _build_system_prompt(
 - 웹페이지 읽기: URL을 받으면 browse tool로 페이지 전체 내용을 가져와 분석하세요
 - YouTube 동영상 자막/내용 요약
 - PDF, 이미지, 문서 파일 분석
+- Playwright 브라우저 자동화 (browser tool): DOM 기반으로 정확하게 웹 조작 — 좌표 없이 selector로 클릭·입력
+  - navigate: URL로 이동 (예: browser(action="navigate", url="https://..."))
+  - click: selector로 버튼/링크 클릭 (예: browser(action="click", selector="text=로그인"))
+  - type: 입력 필드에 텍스트 입력 (예: browser(action="type", selector="#id", text="값"))
+  - screenshot: 브라우저 현재 화면 캡처 — 결과는 채널에 이미지로 자동 업로드됩니다
+  - content: 현재 페이지 텍스트 추출 (DOM 파싱)
+  - scroll / evaluate / wait_for / select / close 도 지원
+  - selector는 텍스트('17일', 'text=확인'), CSS('.btn', '#id'), XPath('//button') 모두 가능
+  - 웹 자동화·스크래핑·폼 제출 시 browser tool을 우선 사용하세요. 좌표 계산 불필요
 - 가상 데스크탑 제어 (computer_use tool): 브라우저 열기, 클릭, 텍스트 입력, 스크린샷 등 GUI 자동화
+  - browser tool로 처리할 수 없는 데스크탑 앱·파일 조작에 사용하세요
   - run_command로 셸 명령 실행 가능: 패키지 설치(apt-get install), 파이썬 스크립트 실행, 파일 조작 등
   - 명령 실행 중 에러가 나면 출력을 읽고 원인을 파악해 후속 명령으로 스스로 해결하세요
   - screenshot 결과는 채널에 이미지 파일로 자동 업로드됩니다. 응답 텍스트에 마크다운 이미지(![...](...)나 attachment 참조)를 포함하지 마세요
@@ -363,7 +373,10 @@ def create_agent_fn(
                 elif text_contexts:
                     full_message = "\n\n".join(text_contexts) + "\n\n" + user_message
 
-        has_computer_use = session_tools.get("computer_use") is not None
+        has_computer_use = (
+            session_tools.get("computer_use") is not None
+            or session_tools.get("browser") is not None
+        )
         timeout = (
             _cfg.AGENT_TIMEOUT_COMPUTER_USE if has_computer_use else _cfg.AGENT_TIMEOUT_DEFAULT
         )

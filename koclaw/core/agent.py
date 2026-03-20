@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 MAX_TURNS_DEFAULT = 50
 _MAX_SAME_TOOL_CALLS = 5
 _MAX_TOTAL_COMPUTER_USE = 40
+_CU_TOOLS: frozenset[str] = frozenset({"computer_use", "browser"})
 
 
 class Agent:
@@ -52,18 +53,18 @@ class Agent:
 
             # 동일 tool+args 반복 호출 감지 (무한루프 방어)
             for tc in response.tool_calls:
-                if tc.name == "computer_use":
+                if tc.name in _CU_TOOLS:
                     total_computer_use += 1
                     if total_computer_use > _MAX_TOTAL_COMPUTER_USE:
                         logger.warning(
                             "[agent] computer_use exceeded %d calls", _MAX_TOTAL_COMPUTER_USE
                         )
                         return (
-                            f"오류: computer_use가 {_MAX_TOTAL_COMPUTER_USE}회를 초과하여 중단합니다. "
+                            f"오류: computer_use/browser가 {_MAX_TOTAL_COMPUTER_USE}회를 초과하여 중단합니다. "
                             "작업을 더 작은 단위로 나눠 요청해주세요."
                         )
                 # screenshot은 상태 확인용으로 반복 호출이 자연스러우므로 제외
-                if tc.name == "computer_use" and tc.arguments.get("action") == "screenshot":
+                if tc.name in _CU_TOOLS and tc.arguments.get("action") == "screenshot":
                     continue
                 key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)}"
                 tool_call_counts[key] = tool_call_counts.get(key, 0) + 1
@@ -110,7 +111,7 @@ class Agent:
             image_b64 = result
             screen_size_hint = ""
             if (
-                tool_call.name == "computer_use"
+                tool_call.name in _CU_TOOLS
                 and tool_call.arguments.get("action") == "screenshot"
                 and isinstance(result, str)
                 and result.startswith("[화면 크기:")
@@ -119,7 +120,7 @@ class Agent:
                 screen_size_hint, image_b64 = result.split("\n", 1)
 
             is_screenshot = (
-                tool_call.name == "computer_use"
+                tool_call.name in _CU_TOOLS
                 and tool_call.arguments.get("action") == "screenshot"
                 and isinstance(result, str)
                 and not image_b64.startswith("스크린샷 실패")
@@ -140,8 +141,8 @@ class Agent:
                 "_screen_size_hint": screen_size_hint,
             }
 
-        # computer_use는 클릭→타이핑→키입력 순서가 중요하므로 순차 실행
-        if any(tc.name == "computer_use" for tc in tool_calls):
+        # computer_use/browser는 클릭→타이핑→키입력 순서가 중요하므로 순차 실행
+        if any(tc.name in _CU_TOOLS for tc in tool_calls):
             results = []
             for tc in tool_calls:
                 results.append(await execute_one(tc))

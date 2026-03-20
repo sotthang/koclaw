@@ -341,6 +341,174 @@ async def list_windows():
     return {"windows": data}
 
 
+# ── Playwright 브라우저 엔드포인트 ───────────────────────────────────────────
+
+
+class BrowserNavigateRequest(BaseModel):
+    url: str
+    wait_until: str = "domcontentloaded"
+
+
+class BrowserClickRequest(BaseModel):
+    selector: str
+
+
+class BrowserTypeRequest(BaseModel):
+    selector: str
+    text: str
+    clear_first: bool = True
+
+
+class BrowserScrollRequest(BaseModel):
+    direction: str = "down"
+    amount: int = 3
+
+
+class BrowserEvaluateRequest(BaseModel):
+    script: str
+
+
+class BrowserWaitForRequest(BaseModel):
+    selector: str
+    timeout: float = 10.0
+
+
+class BrowserSelectRequest(BaseModel):
+    selector: str
+    value: str
+
+
+def _get_browser():
+    """Playwright 브라우저 인스턴스를 반환 (없으면 예외)."""
+    if _pw_page is None:
+        raise HTTPException(
+            status_code=503,
+            detail="브라우저가 시작되지 않았습니다. /browser/navigate로 먼저 URL을 열어주세요.",
+        )
+    return _pw_page
+
+
+# Playwright 전역 상태
+_pw_playwright = None
+_pw_browser = None
+_pw_page = None
+
+
+async def _ensure_browser():
+    """Playwright 브라우저가 없으면 시작한다."""
+    global _pw_playwright, _pw_browser, _pw_page
+    if _pw_page is not None:
+        return _pw_page
+    from playwright.async_api import async_playwright
+
+    _pw_playwright = await async_playwright().start()
+    _pw_browser = await _pw_playwright.chromium.launch(headless=False)
+    _pw_page = await _pw_browser.new_page()
+    return _pw_page
+
+
+@app.post("/browser/navigate", dependencies=[Auth])
+async def browser_navigate(req: BrowserNavigateRequest):
+    """URL로 이동."""
+    page = await _ensure_browser()
+    await page.goto(req.url, wait_until=req.wait_until)
+    return {"ok": True, "url": page.url, "title": await page.title()}
+
+
+@app.get("/browser/screenshot", dependencies=[Auth])
+async def browser_screenshot():
+    """브라우저 현재 화면 캡처 — base64 JPEG."""
+    page = _get_browser()
+    jpeg = await page.screenshot(type="jpeg", quality=75)
+    vp = page.viewport_size or {"width": 1280, "height": 720}
+    return {
+        "data": base64.b64encode(jpeg).decode(),
+        "width": vp["width"],
+        "height": vp["height"],
+        "format": "jpeg",
+    }
+
+
+@app.post("/browser/click", dependencies=[Auth])
+async def browser_click(req: BrowserClickRequest):
+    """selector로 요소 클릭."""
+    page = _get_browser()
+    await page.click(req.selector)
+    return {"ok": True}
+
+
+@app.post("/browser/type", dependencies=[Auth])
+async def browser_type(req: BrowserTypeRequest):
+    """selector 요소에 텍스트 입력."""
+    page = _get_browser()
+    if req.clear_first:
+        await page.fill(req.selector, req.text)
+    else:
+        await page.type(req.selector, req.text)
+    return {"ok": True}
+
+
+@app.post("/browser/scroll", dependencies=[Auth])
+async def browser_scroll(req: BrowserScrollRequest):
+    """페이지 스크롤."""
+    page = _get_browser()
+    delta = req.amount * 300
+    if req.direction == "up":
+        delta = -delta
+    await page.evaluate(f"window.scrollBy(0, {delta})")
+    return {"ok": True}
+
+
+@app.post("/browser/evaluate", dependencies=[Auth])
+async def browser_evaluate(req: BrowserEvaluateRequest):
+    """JavaScript 실행."""
+    page = _get_browser()
+    result = await page.evaluate(req.script)
+    return {"result": str(result) if result is not None else "(결과 없음)"}
+
+
+@app.get("/browser/content", dependencies=[Auth])
+async def browser_content():
+    """현재 페이지 텍스트 내용."""
+    page = _get_browser()
+    title = await page.title()
+    url = page.url
+    content = await page.evaluate("document.body.innerText")
+    return {"title": title, "url": url, "content": content[:5000]}
+
+
+@app.post("/browser/wait_for", dependencies=[Auth])
+async def browser_wait_for(req: BrowserWaitForRequest):
+    """selector가 나타날 때까지 대기."""
+    page = _get_browser()
+    await page.wait_for_selector(req.selector, timeout=req.timeout * 1000)
+    return {"ok": True}
+
+
+@app.post("/browser/select", dependencies=[Auth])
+async def browser_select(req: BrowserSelectRequest):
+    """<select> 요소 선택."""
+    page = _get_browser()
+    await page.select_option(req.selector, req.value)
+    return {"ok": True}
+
+
+@app.post("/browser/close", dependencies=[Auth])
+async def browser_close():
+    """브라우저 닫기."""
+    global _pw_playwright, _pw_browser, _pw_page
+    if _pw_page is not None:
+        await _pw_page.close()
+        _pw_page = None
+    if _pw_browser is not None:
+        await _pw_browser.close()
+        _pw_browser = None
+    if _pw_playwright is not None:
+        await _pw_playwright.stop()
+        _pw_playwright = None
+    return {"ok": True}
+
+
 @app.get("/stream")
 async def stream():
     """MJPEG 스트림 — 브라우저에서 실시간 화면 시청 (인증 불필요)."""

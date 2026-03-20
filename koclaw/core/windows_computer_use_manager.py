@@ -206,6 +206,93 @@ class WindowsComputerUseManager:
     async def stop_all(self) -> None:
         """Docker 방식과의 호환성을 위한 no-op."""
 
+    # ── Browser (Playwright) 메서드 ────────────────────────────────────────
+
+    async def browser_navigate(
+        self, session_id: str, url: str, wait_until: str = "domcontentloaded"
+    ) -> str:
+        try:
+            data = await self._post("/browser/navigate", {"url": url, "wait_until": wait_until})
+        except httpx.HTTPError as e:
+            return f"브라우저 이동 실패: {e}"
+        return f"✅ 페이지 이동 완료: {data.get('title', '')} ({data.get('url', url)})"
+
+    async def browser_screenshot(self, session_id: str) -> str:
+        """브라우저 스크린샷 — base64 JPEG 반환 (computer_use screenshot과 동일 형식)."""
+        try:
+            data = await self._get("/browser/screenshot")
+        except httpx.HTTPError as e:
+            return f"브라우저 스크린샷 실패: {e}"
+        b64 = data["data"]
+        self._screenshots.setdefault(session_id, []).append(base64.b64decode(b64))
+        w = data.get("width", 0)
+        h = data.get("height", 0)
+        if w and h:
+            return f"[화면 크기: {w}x{h}]\n{b64}"
+        return b64
+
+    async def browser_click(self, session_id: str, selector: str) -> str:
+        try:
+            await self._post("/browser/click", {"selector": selector})
+        except httpx.HTTPError as e:
+            return f"브라우저 클릭 실패: {e}"
+        return f"✅ 클릭 완료: {selector}"
+
+    async def browser_type(
+        self, session_id: str, selector: str, text: str, clear_first: bool = True
+    ) -> str:
+        try:
+            await self._post(
+                "/browser/type", {"selector": selector, "text": text, "clear_first": clear_first}
+            )
+        except httpx.HTTPError as e:
+            return f"브라우저 입력 실패: {e}"
+        return f"✅ 입력 완료: {selector} ← {text[:30]}"
+
+    async def browser_scroll(
+        self, session_id: str, direction: str = "down", amount: int = 3
+    ) -> str:
+        try:
+            await self._post("/browser/scroll", {"direction": direction, "amount": amount})
+        except httpx.HTTPError as e:
+            return f"브라우저 스크롤 실패: {e}"
+        return f"✅ {direction} 스크롤 완료"
+
+    async def browser_evaluate(self, session_id: str, script: str) -> str:
+        try:
+            data = await self._post("/browser/evaluate", {"script": script})
+        except httpx.HTTPError as e:
+            return f"JS 실행 실패: {e}"
+        return data.get("result", "(결과 없음)")
+
+    async def browser_content(self, session_id: str) -> str:
+        try:
+            data = await self._get("/browser/content")
+        except httpx.HTTPError as e:
+            return f"페이지 내용 조회 실패: {e}"
+        return f"[{data.get('title', '')}] {data.get('url', '')}\n\n{data.get('content', '')}"
+
+    async def browser_wait_for(self, session_id: str, selector: str, timeout: float = 10.0) -> str:
+        try:
+            await self._post("/browser/wait_for", {"selector": selector, "timeout": timeout})
+        except httpx.HTTPError as e:
+            return f"대기 실패: {e}"
+        return f"✅ 요소 나타남: {selector}"
+
+    async def browser_select(self, session_id: str, selector: str, value: str) -> str:
+        try:
+            await self._post("/browser/select", {"selector": selector, "value": value})
+        except httpx.HTTPError as e:
+            return f"선택 실패: {e}"
+        return f"✅ 선택 완료: {selector} = {value}"
+
+    async def browser_close(self, session_id: str) -> str:
+        try:
+            await self._post("/browser/close", {})
+        except httpx.HTTPError as e:
+            return f"브라우저 닫기 실패: {e}"
+        return "✅ 브라우저 닫힘"
+
     def stream_url(self) -> str:
         return f"{self._view_url}/stream"
 

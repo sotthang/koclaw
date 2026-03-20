@@ -156,7 +156,7 @@ def _build_system_prompt(
   - run_command로 셸 명령 실행 가능: 패키지 설치(apt-get install), 파이썬 스크립트 실행, 파일 조작 등
   - 명령 실행 중 에러가 나면 출력을 읽고 원인을 파악해 후속 명령으로 스스로 해결하세요
   - screenshot 결과는 채널에 이미지 파일로 자동 업로드됩니다. 응답 텍스트에 마크다운 이미지(![...](...)나 attachment 참조)를 포함하지 마세요
-  - screenshot은 작업 완료 후 최종 결과 확인 시에만 1회 찍으세요. 매 액션마다 찍지 마세요
+  - screenshot은 클릭·입력 등 중요한 액션 직후 결과 확인에 사용하세요. 단순 이동이나 연속 타이핑 중간에는 생략 가능
   - 클릭/스크롤 좌표는 반드시 screenshot 이미지 기준으로 계산하세요. get_screen_size 값이 아닌 이미지에서 보이는 위치를 그대로 사용하세요
   - 웹 검색은 open_url로 검색 URL을 직접 구성하세요. 예: 구글 검색은 open_url(url="https://www.google.com/search?q=검색어") 형태로 사용
   - 브라우저에 텍스트를 입력할 때는 반드시 type 액션으로 타이핑한 후 key(key_name="Return")로 제출하세요

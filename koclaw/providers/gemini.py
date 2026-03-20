@@ -11,7 +11,10 @@ DEFAULT_MODEL = "gemini-3-flash-preview"
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL):
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=120_000),
+        )
         self._model = model
 
     async def complete(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
@@ -39,7 +42,6 @@ class GeminiProvider(LLMProvider):
             model=self._model,
             contents=contents,
             config=types.GenerateContentConfig(**config_kwargs),
-            http_options=types.HttpOptions(timeout=120_000),  # 120초
         )
 
         raw_content = response.candidates[0].content

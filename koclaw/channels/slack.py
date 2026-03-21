@@ -55,6 +55,9 @@ HELP_TEXT = """\
   - `팀 미팅 삭제해줘`
 • *이메일 전송* — Gmail로 이메일 전송 (`.env`에 `GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요)
   - `summary@example.com으로 오늘 AI 뉴스 요약 메일 보내줘`
+• *Docker 로그 조회* — 실행 중인 컨테이너 로그 확인
+  - `내 docker 로그 확인해줘`
+  - `docker 컨테이너 목록 보여줘`
 • *MCP 서버 연동* — `mcp_servers.json` 에 서버를 등록하면 외부 tool 자동 연결 (Notion, GitHub 등)
 • *멀티 에이전트* — 복잡한 태스크를 전문 서브 에이전트에게 위임하거나 병렬 처리
   - `ChatGPT, Claude, Gemini 세 개를 각각 동시에 조사해서 비교해줘`

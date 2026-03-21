@@ -17,6 +17,7 @@ from koclaw.storage.db import Database
 from koclaw.tools.browse import BrowseTool
 from koclaw.tools.calendar import CalendarTool
 from koclaw.tools.computer_use import ComputerUseTool
+from koclaw.tools.docker_logs import DockerLogsTool
 from koclaw.tools.email import EmailTool
 from koclaw.tools.rss import RssFeedTool
 from koclaw.tools.search import SearchTool
@@ -50,6 +51,7 @@ async def main():
     tools.register(EmailTool())
     tools.register(WeatherTool())
     tools.register(CalendarTool())
+    tools.register(DockerLogsTool())
 
     computer_use_manager: ComputerUseManager | WindowsComputerUseManager | None = None
     windows_agent_url = env.get("WINDOWS_AGENT_URL", "").strip()

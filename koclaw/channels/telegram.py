@@ -365,6 +365,7 @@ async def start(
 ) -> None:
     try:
         from telegram.ext import Application, MessageHandler, filters
+        from telegram.request import HTTPXRequest
     except ImportError:
         raise ImportError(
             "Telegram 채널을 사용하려면 python-telegram-bot을 설치하세요: "
@@ -378,7 +379,8 @@ async def start(
     from koclaw.tools.memory import MemoryTool
     from koclaw.tools.scheduler import SchedulerTool
 
-    app = Application.builder().token(env["TELEGRAM_BOT_TOKEN"]).build()
+    request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0)
+    app = Application.builder().token(env["TELEGRAM_BOT_TOKEN"]).request(request).build()
 
     async def file_fetcher(url: str) -> bytes:
         return await _telegram_file_fetcher(url, app.bot)

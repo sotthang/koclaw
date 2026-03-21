@@ -141,10 +141,36 @@ async def main():
                 "⚠️  Discord 채널 비활성화: discord.py 미설치 (pip install 'koclaw[discord]')"
             )
 
+    if env.get("TELEGRAM_BOT_TOKEN"):
+        try:
+            from telegram.ext import Application  # noqa: F401
+
+            from koclaw.channels import telegram as telegram_ch
+
+            runners.append(
+                telegram_ch.start(
+                    env,
+                    provider,
+                    tools,
+                    db,
+                    workspace=WORKSPACE_DIR,
+                    notify_registry=notify_registry,
+                    agent_registry=agent_registry,
+                    computer_use_manager=computer_use_manager,
+                )
+            )
+            logger.info("Telegram 채널 활성화")
+        except ImportError:
+            logger.warning(
+                "⚠️  Telegram 채널 비활성화: python-telegram-bot 미설치 "
+                "(pip install 'koclaw[telegram]')"
+            )
+
     if not runners:
         raise ValueError(
             "설정된 채널이 없습니다. "
-            ".env 파일에 SLACK_BOT_TOKEN 또는 DISCORD_BOT_TOKEN을 설정하세요."
+            ".env 파일에 SLACK_BOT_TOKEN, DISCORD_BOT_TOKEN 또는 "
+            "TELEGRAM_BOT_TOKEN을 설정하세요."
         )
 
     async def route_notify(session_id: str, message: str) -> None:

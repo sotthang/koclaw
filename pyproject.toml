@@ -29,7 +29,8 @@ search  = ["ddgs>=6.0.0"]
 browse  = ["beautifulsoup4>=4.12.0"]
 file    = ["pypdf>=4.0.0", "python-docx>=1.1.0", "openpyxl>=3.1.0", "python-pptx>=0.6.23"]
 korean  = ["pyhwp>=0.1b15", "python-hwpx>=2.0"]
-discord = ["discord.py>=2.0.0"]
+discord  = ["discord.py>=2.0.0"]
+telegram = ["python-telegram-bot>=20.0"]
 rss     = ["feedparser>=6.0.0"]
 email   = ["aiosmtplib>=3.0.0"]
 mcp      = ["mcp>=1.0.0"]
@@ -42,6 +43,7 @@ all     = [
     "koclaw[file]",
     "koclaw[korean]",
     "koclaw[discord]",
+    "koclaw[telegram]",
     "koclaw[rss]",
     "koclaw[email]",
     "koclaw[mcp]",

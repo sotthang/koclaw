@@ -53,6 +53,16 @@ _DISCORD_FORMAT_INSTRUCTIONS = """\
 - 코드: `인라인 코드` 또는 ```코드 블록```
 - 구분선: --- 사용 가능"""
 
+_TELEGRAM_FORMAT_INSTRUCTIONS = """\
+응답은 Telegram HTML 형식으로 작성하세요:
+- 굵게: <b>텍스트</b>
+- 기울임: <i>텍스트</i>
+- 코드: <code>인라인 코드</code> 또는 <pre><code>코드 블록</code></pre>
+- 제목/섹션: <b>텍스트</b> (# ## ### 사용 금지)
+- 목록: • 또는 - 로 시작 (들여쓰기는 공백 4칸)
+- 구분선: --- 사용 금지, 빈 줄로 단락 구분
+- HTML 특수문자(&, <, >, ")는 반드시 이스케이프하세요: &amp; &lt; &gt; &quot;"""
+
 
 def _resolve_model(name: str, env: dict) -> str | None:
     """provider별 모델 환경변수 우선, 없으면 DEFAULT_MODEL 사용."""

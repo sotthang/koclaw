@@ -2,7 +2,8 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
-    "python_full_version >= '3.13'",
+    "python_full_version >= '3.14'",
+    "python_full_version == '3.13.*'",
     "python_full_version < '3.13'",
 ]
 
@@ -971,6 +972,7 @@ all = [
     { name = "python-docx" },
     { name = "python-hwpx" },
     { name = "python-pptx" },
+    { name = "python-telegram-bot" },
     { name = "slack-bolt" },
     { name = "youtube-transcript-api" },
 ]
@@ -1008,6 +1010,9 @@ search = [
 ]
 slack = [
     { name = "slack-bolt" },
+]
+telegram = [
+    { name = "python-telegram-bot" },
 ]
 youtube = [
     { name = "youtube-transcript-api" },
@@ -1047,6 +1052,7 @@ requires-dist = [
     { name = "koclaw", extras = ["rss"], marker = "extra == 'all'" },
     { name = "koclaw", extras = ["search"], marker = "extra == 'all'" },
     { name = "koclaw", extras = ["slack"], marker = "extra == 'all'" },
+    { name = "koclaw", extras = ["telegram"], marker = "extra == 'all'" },
     { name = "koclaw", extras = ["youtube"], marker = "extra == 'all'" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0.0" },
     { name = "openai", specifier = ">=1.50.0" },
@@ -1060,12 +1066,13 @@ requires-dist = [
     { name = "python-hwpx", marker = "extra == 'korean'", specifier = ">=2.0" },
     { name = "python-pptx", specifier = ">=0.6.23" },
     { name = "python-pptx", marker = "extra == 'file'", specifier = ">=0.6.23" },
+    { name = "python-telegram-bot", marker = "extra == 'telegram'", specifier = ">=20.0" },
     { name = "slack-bolt", specifier = ">=1.21.0" },
     { name = "slack-bolt", marker = "extra == 'slack'", specifier = ">=1.21.0" },
     { name = "youtube-transcript-api", specifier = ">=0.6.0" },
     { name = "youtube-transcript-api", marker = "extra == 'youtube'", specifier = ">=0.6.0" },
 ]
-provides-extras = ["slack", "youtube", "search", "browse", "file", "korean", "discord", "rss", "email", "mcp", "calendar", "all"]
+provides-extras = ["slack", "youtube", "search", "browse", "file", "korean", "discord", "telegram", "rss", "email", "mcp", "calendar", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1773,6 +1780,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/52/a9/0c0db8d37b2b8a645666f7fd8accea4c6224e013c42b1d5c17c93590cd06/python_pptx-1.0.2.tar.gz", hash = "sha256:479a8af0eaf0f0d76b6f00b0887732874ad2e3188230315290cd1f9dd9cc7095", size = 10109297, upload-time = "2024-08-07T17:33:37.772Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/4f/00be2196329ebbff56ce564aa94efb0fbc828d00de250b1980de1a34ab49/python_pptx-1.0.2-py3-none-any.whl", hash = "sha256:160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba", size = 472788, upload-time = "2024-08-07T17:33:28.192Z" },
+]
+
+[[package]]
+name = "python-telegram-bot"
+version = "22.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpcore", marker = "python_full_version >= '3.14'" },
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/25/2258161b1069e66d6c39c0a602dbe57461d4767dc0012539970ea40bc9d6/python_telegram_bot-22.7.tar.gz", hash = "sha256:784b59ea3852fe4616ad63b4a0264c755637f5d725e87755ecdee28300febf61", size = 1516454, upload-time = "2026-03-16T09:36:03.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/f7/0e2f89dd62f45d46d4ea0d8aec5893ce5b37389638db010c117f46f11450/python_telegram_bot-22.7-py3-none-any.whl", hash = "sha256:d72eed532cf763758cd9331b57a6d790aff0bb4d37d8f4e92149436fe21c6475", size = 745365, upload-time = "2026-03-16T09:36:01.498Z" },
 ]
 
 [[package]]

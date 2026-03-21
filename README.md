@@ -14,7 +14,7 @@
 - **멀티 에이전트** — 복잡한 태스크를 전문 서브 에이전트에 위임하거나 병렬 처리
 - **MCP 연동** — `mcp_servers.json`에 MCP 서버 등록 시 외부 tool 자동 연결 (Notion, GitHub 등)
 - **플러그인 아키텍처** — 커스텀 도구를 플러그인으로 추가 가능
-- **채널 연동** — Slack, Discord 지원
+- **채널 연동** — Slack, Discord, Telegram 지원
 - **가상 데스크탑** — Docker 가상 환경 또는 Windows 네이티브 데스크탑에서 브라우저 조작, 클릭, 스크린샷 등 Computer Use
 - **계층형 메모리** — 유저/채널/스레드 단위 장기 기억 저장, 대화 자동 요약
 
@@ -81,6 +81,7 @@ uv run pytest tests/
 | `SLACK_BOT_TOKEN` | Slack 봇 토큰 (`xoxb-...`) | Slack 사용 시 |
 | `SLACK_APP_TOKEN` | Slack 앱 토큰 (`xapp-...`) | Slack 사용 시 |
 | `DISCORD_BOT_TOKEN` | Discord 봇 토큰 | Discord 사용 시 |
+| `TELEGRAM_BOT_TOKEN` | Telegram 봇 토큰 (BotFather에서 발급) | Telegram 사용 시 |
 | `WINDOWS_AGENT_URL` | Windows Agent 주소 (예: `http://192.168.1.10:7777`) — 설정 시 실제 Windows 화면 제어 | 선택 |
 | `MCP_SERVERS_CONFIG` | MCP 서버 설정 파일 경로 (기본: `mcp_servers.json`) — 파일 없으면 MCP 비활성화 | 선택 |
 | `WEBHOOK_HOST` | 웹훅 서버 외부 주소 (예: `https://your-host.ts.net`) — 설정 시 웹훅 서버 활성화 | 선택 |
@@ -100,6 +101,9 @@ uv run pytest tests/
 | Slack 스레드 | 스레드 내에서 바로 메시지 또는 `@봇이름 질문` |
 | Discord DM | 봇에게 직접 메시지 전송 |
 | Discord 서버 채널 | 채널에서 바로 메시지 또는 `@봇이름 질문` |
+| Telegram DM | 봇에게 직접 메시지 전송 |
+| Telegram 그룹 | `@봇이름 질문` 또는 봇 메시지에 답장 |
+| Telegram 포럼 토픽 | 토픽 안에서 `@봇이름 질문` 또는 봇 메시지에 답장 |
 
 도움말을 보려면 `help` 또는 `/help`를 입력하세요.
 
@@ -270,6 +274,8 @@ cp mcp_servers.json.example mcp_servers.json
 
 koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 달면 해당 메시지가 삭제됩니다.
 
+> **Telegram**: 메시지 삭제 기능은 지원하지 않습니다.
+
 ## 지원 도구
 
 | 도구 | 설명 |
@@ -330,6 +336,7 @@ DEFAULT_MODEL=llama3
 | --- | --- |
 | Slack | [docs/channels/slack.md](docs/channels/slack.md) |
 | Discord | [docs/channels/discord.md](docs/channels/discord.md) |
+| Telegram | [docs/channels/telegram.md](docs/channels/telegram.md) |
 
 ## 아키텍처
 
@@ -364,7 +371,8 @@ koclaw/
 │   └── computer_use.py    # 가상 데스크탑 제어
 ├── channels/
 │   ├── slack.py           # Slack 채널 핸들러
-│   └── discord.py         # Discord 채널 핸들러
+│   ├── discord.py         # Discord 채널 핸들러
+│   └── telegram.py        # Telegram 채널 핸들러
 ├── storage/
 │   └── db.py              # SQLite 비동기 DB
 └── app.py                 # 에이전트 팩토리 / 설정
@@ -455,7 +463,7 @@ git push origin feature/{기능명}
 
 ## 보안
 
-이 프로젝트는 **폐쇄적인 신뢰 환경(사내 Slack/Discord 등)**을 가정합니다.
+이 프로젝트는 **폐쇄적인 신뢰 환경(사내 Slack/Discord/Telegram 등)**을 가정합니다.
 
 구현된 보안 대책: 프롬프트 인젝션 방어, SSRF 차단, 무한 루프 감지, 파일 크기 제한, SQL 파라미터화.
 

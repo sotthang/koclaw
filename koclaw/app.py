@@ -171,6 +171,8 @@ def _build_system_prompt(
   - scroll / evaluate / wait_for / select / close 도 지원
   - selector는 텍스트('17일', 'text=확인'), CSS('.btn', '#id'), XPath('//button') 모두 가능
   - 웹 자동화·스크래핑·폼 제출 시 browser tool을 우선 사용하세요. 좌표 계산 불필요
+  - 페이지 상태 확인·스크래핑은 content(텍스트 추출)나 evaluate(JS 실행)를 우선 사용하세요. screenshot은 시각적 확인이 꼭 필요할 때만 사용하세요
+  - 브라우저 상태는 대화 간에 유지됩니다. 이전 대화에서 navigate한 페이지는 여전히 열려 있으므로, 현재 상태가 필요하면 content나 screenshot으로 직접 확인하세요
 - 가상 데스크탑 제어 (computer_use tool): 브라우저 열기, 클릭, 텍스트 입력, 스크린샷 등 GUI 자동화
   - browser tool로 처리할 수 없는 데스크탑 앱·파일 조작에 사용하세요
   - run_command로 셸 명령 실행 가능: 패키지 설치(apt-get install), 파이썬 스크립트 실행, 파일 조작 등

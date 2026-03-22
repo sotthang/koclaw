@@ -123,8 +123,7 @@ class Agent:
                 tool_call.name in _CU_TOOLS
                 and tool_call.arguments.get("action") == "screenshot"
                 and isinstance(result, str)
-                and not image_b64.startswith("스크린샷 실패")
-                and not image_b64.startswith("Error")
+                and (image_b64.startswith("/9j/") or image_b64.startswith("iVBOR"))
             )
             # JPEG base64은 /9j/ 로 시작, PNG는 iVBOR 로 시작
             mime_type = (

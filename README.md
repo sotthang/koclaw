@@ -193,7 +193,13 @@ Docker 컨테이너 안의 가상 화면을 제어합니다. `WINDOWS_AGENT_URL`
 
 ##### 모드 2: Windows 네이티브 데스크탑
 
-실제 Windows 화면을 직접 제어합니다. Slack, Excel, 탐색기 등 모든 Windows 앱을 조작할 수 있습니다.
+실제 Windows 화면을 직접 제어하고 PowerShell 명령을 실행합니다. Slack, Excel, 탐색기 등 모든 Windows 앱 조작 및 시스템 관리가 가능합니다.
+
+활성화 시 추가되는 도구:
+
+- `windows_shell` — PowerShell 명령 실행 (디스크 용량, 프로세스, 서비스 관리 등)
+- `browser` — Playwright DOM 기반 브라우저 자동화
+- `computer_use` — 화면 캡처, 마우스/키보드 제어 (명시적 요청 시)
 
 설치 방법:
 
@@ -289,6 +295,7 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `webhook` | 외부 서비스 이벤트 수신 — GitHub, CI/CD, 모니터링 등 POST 웹훅을 DM/채널로 전달 (`WEBHOOK_HOST` 필요) |
 | `calendar` | iCloud 캘린더 일정 조회·추가·수정·삭제 — CalDAV 기반 (`CALDAV_URL` / `CALDAV_USERNAME` / `CALDAV_PASSWORD` 필요) |
 | `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
+| `windows_shell` | Windows PowerShell 명령 실행 — 디스크 용량, 프로세스, 서비스 관리 등 (Windows Agent 필요) |
 | `computer_use` | 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 또는 Windows Agent) |
 | `delegate` | 서브 에이전트에게 하위 태스크 위임 / 병렬 처리 (멀티 에이전트) |
 | 파일 분석 | PDF, DOCX, HWP, HWPX, Excel(.xlsx), PPTX, 이미지 자동 파싱 (첨부 시 자동) |
@@ -368,7 +375,8 @@ koclaw/
 │   ├── memory.py          # 장기 기억 (DB 기반)
 │   ├── file.py            # 파일 읽기/목록
 │   ├── delegate.py        # 멀티 에이전트 (서브 에이전트 위임)
-│   └── computer_use.py    # 가상 데스크탑 제어
+│   ├── computer_use.py    # 가상 데스크탑 제어
+│   └── windows_shell.py   # Windows PowerShell 명령 실행
 ├── channels/
 │   ├── slack.py           # Slack 채널 핸들러
 │   ├── discord.py         # Discord 채널 핸들러

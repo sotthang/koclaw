@@ -22,6 +22,10 @@ HELP_TEXT = """\
   - `도쿄 오늘 날씨 어때?`
 • **YouTube 요약** — 동영상 링크를 보내면 내용을 요약
 • **파일 분석** — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
+• **Windows PowerShell 실행** — Windows PC에서 PowerShell 명령 실행 (Windows Agent 필요)
+  - `C 드라이브 용량 얼마나 남았어?`
+  - `실행 중인 프로세스 상위 10개 보여줘`
+  - `Windows 서비스 목록 확인해줘`
 • **브라우저 자동화** — Playwright DOM 기반 웹 제어 (좌표 없이 selector로 클릭·입력) (Windows Agent 필요)
   - `네이버 열고 로그인 버튼 눌러줘` — text selector 자동 탐지
   - `이 페이지에서 검색창에 "AI" 입력하고 검색해줘`
@@ -81,6 +85,7 @@ _TOOL_ICONS: dict[str, str] = {
     "youtube": "🎬",
     "computer_use": "🖥️",
     "browser": "🧭",
+    "windows_shell": "💻",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",

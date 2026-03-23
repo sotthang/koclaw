@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 class BrowserTool(Tool):
     name = "browser"
     description = (
+        "⚠️ 사용자가 '브라우저', '화면', '스크린샷', '클릭', 'browser' 등 브라우저 제어를 명시적으로 언급한 경우에만 사용하세요. "
+        "그 외 일반 웹 검색·조회 작업에는 browse/search tool을 사용하세요. "
         "Playwright 기반 브라우저 자동화 tool. "
         "selector로 요소를 직접 지정해 클릭·입력·스크롤을 수행합니다. "
         "selector는 텍스트('17일', 'text=확인'), CSS('.btn', '#id'), XPath('//button') 형식 모두 지원합니다. "

@@ -24,6 +24,9 @@ HELP_TEXT = """\
   - <code>서울 날씨 알려줘</code>
 • <b>YouTube 요약</b> — 동영상 링크를 보내면 내용을 요약
 • <b>파일 분석</b> — PDF, DOCX, HWPX, 이미지 첨부 시 자동 분석
+• <b>Windows PowerShell 실행</b> — Windows PC에서 PowerShell 명령 실행 (Windows Agent 필요)
+  - <code>C 드라이브 용량 얼마나 남았어?</code>
+  - <code>실행 중인 프로세스 상위 10개 보여줘</code>
 • <b>브라우저 자동화</b> — Playwright DOM 기반 웹 제어 (Windows Agent 필요)
 • <b>가상 데스크탑 제어</b> — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
 • <b>웹훅</b> — 외부 서비스(GitHub, CI/CD 등) 이벤트를 DM/채널로 수신
@@ -59,6 +62,7 @@ _TOOL_ICONS: dict[str, str] = {
     "youtube": "🎬",
     "computer_use": "🖥️",
     "browser": "🧭",
+    "windows_shell": "💻",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",

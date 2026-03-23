@@ -20,7 +20,7 @@ def _split_text(text: str) -> list[str]:
     return chunks
 
 
-HELP_TEXT = """\
+HELP_TEXT = r"""\
 *koclaw 사용 가이드*
 
 *기본 대화*

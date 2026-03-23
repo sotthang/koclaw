@@ -7,7 +7,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-HELP_TEXT = """\
+HELP_TEXT = r"""\
 <b>koclaw 사용 가이드</b>
 
 <b>기본 대화</b>

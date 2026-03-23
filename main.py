@@ -59,6 +59,7 @@ async def main():
         windows_agent_api_key = env.get("WINDOWS_AGENT_API_KEY", "").strip()
         windows_agent_view_url = env.get("WINDOWS_AGENT_VIEW_URL", "").strip()
         from koclaw.tools.browser import BrowserTool
+        from koclaw.tools.windows_file import WindowsFileTool
         from koclaw.tools.windows_shell import WindowsShellTool
 
         computer_use_manager = WindowsComputerUseManager(

@@ -69,8 +69,9 @@ async def main():
         tools.register(ComputerUseTool(manager=computer_use_manager))
         tools.register(BrowserTool(manager=computer_use_manager))
         tools.register(WindowsShellTool(manager=computer_use_manager))
+        tools.register(WindowsFileTool(manager=computer_use_manager))
         logger.info(
-            "🖥️  Windows Agent 감지됨 — computer_use + browser + windows_shell 활성화 (%s)",
+            "🖥️  Windows Agent 감지됨 — computer_use + browser + windows_shell + windows_file 활성화 (%s)",
             windows_agent_url,
         )
     elif shutil.which("docker"):

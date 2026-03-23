@@ -293,6 +293,50 @@ class WindowsComputerUseManager:
             return f"브라우저 닫기 실패: {e}"
         return "✅ 브라우저 닫힘"
 
+    async def file_info(self, path: str) -> dict:
+        """파일 메타데이터 조회 (크기, 페이지수, 시트 목록 등)."""
+        try:
+            return await self._post("/file_info", {"path": path}, timeout=30.0)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"error": f"파일 없음: {path}"}
+            return {"error": f"조회 실패: {e}"}
+        except httpx.HTTPError as e:
+            return {"error": f"연결 오류: {e}"}
+
+    async def extract_text(
+        self,
+        path: str,
+        sheet: str | None = None,
+        page_start: int | None = None,
+        page_end: int | None = None,
+        row_start: int | None = None,
+        row_end: int | None = None,
+        timeout: float = 120.0,
+    ) -> str:
+        """파일에서 텍스트 추출. 범위 지정으로 대용량 파일 청크 처리 가능."""
+        body: dict = {"path": path}
+        if sheet is not None:
+            body["sheet"] = sheet
+        if page_start is not None:
+            body["page_start"] = page_start
+        if page_end is not None:
+            body["page_end"] = page_end
+        if row_start is not None:
+            body["row_start"] = row_start
+        if row_end is not None:
+            body["row_end"] = row_end
+        try:
+            data = await self._post("/extract_text", body, timeout=timeout)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return f"파일 없음: {path}"
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            return f"텍스트 추출 실패: {detail}"
+        except httpx.HTTPError as e:
+            return f"연결 오류: {e}"
+        return data.get("text", "(텍스트 없음)")
+
     def stream_url(self) -> str:
         return f"{self._view_url}/stream"
 

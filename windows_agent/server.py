@@ -97,6 +97,19 @@ class ReadFileRequest(BaseModel):
     path: str
 
 
+class FileInfoRequest(BaseModel):
+    path: str
+
+
+class ExtractTextRequest(BaseModel):
+    path: str
+    sheet: str | None = None  # Excel: 시트 이름 (미지정 시 전체)
+    page_start: int | None = None  # PDF/PPTX: 시작 페이지 (1-based)
+    page_end: int | None = None  # PDF/PPTX: 끝 페이지 (1-based, 포함)
+    row_start: int | None = None  # Excel: 시작 행 (1-based)
+    row_end: int | None = None  # Excel: 끝 행 (1-based, 포함)
+
+
 # ── 헬퍼 ────────────────────────────────────────────────
 
 
@@ -311,6 +324,173 @@ async def read_file(req: ReadFileRequest):
         "name": p.name,
         "size": len(data),
     }
+
+
+@app.post("/file_info", dependencies=[Auth])
+async def file_info(req: FileInfoRequest):
+    """파일 메타데이터 반환 — 크기, 타입, 페이지수/시트 목록."""
+    from pathlib import Path
+
+    p = Path(req.path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail=f"파일 없음: {req.path}")
+
+    ext = p.suffix.lower()
+    size = p.stat().st_size
+    info: dict = {"name": p.name, "size": size, "ext": ext}
+
+    def _get_info():
+        if ext == ".pdf":
+            from pypdf import PdfReader
+
+            reader = PdfReader(str(p))
+            info["pages"] = len(reader.pages)
+        elif ext in (".xlsx", ".xls"):
+            import openpyxl
+
+            wb = openpyxl.load_workbook(str(p), read_only=True, data_only=True)
+            sheet_info = []
+            for name in wb.sheetnames:
+                ws = wb[name]
+                sheet_info.append({"name": name, "rows": ws.max_row, "cols": ws.max_column})
+            wb.close()
+            info["sheets"] = sheet_info
+        elif ext == ".pptx":
+            from pptx import Presentation
+
+            prs = Presentation(str(p))
+            info["slides"] = len(prs.slides)
+        elif ext == ".docx":
+            from docx import Document
+
+            doc = Document(str(p))
+            info["paragraphs"] = len(doc.paragraphs)
+
+    try:
+        await asyncio.to_thread(_get_info)
+    except Exception as e:
+        info["warning"] = f"메타데이터 조회 실패: {e}"
+
+    return info
+
+
+def _rows_to_markdown(rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+    header = rows[0]
+    sep = ["---"] * len(header)
+    lines = [
+        "| " + " | ".join(str(c) for c in header) + " |",
+        "| " + " | ".join(sep) + " |",
+    ]
+    for row in rows[1:]:
+        padded = list(row) + [""] * max(0, len(header) - len(row))
+        lines.append("| " + " | ".join(str(c) for c in padded[: len(header)]) + " |")
+    return "\n".join(lines)
+
+
+@app.post("/extract_text", dependencies=[Auth])
+async def extract_text(req: ExtractTextRequest):
+    """파일에서 텍스트를 추출해 반환. 범위 지정으로 대용량 파일 청크 처리 지원."""
+    from pathlib import Path
+
+    p = Path(req.path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail=f"파일 없음: {req.path}")
+
+    ext = p.suffix.lower()
+
+    def _extract() -> str:
+        if ext == ".pdf":
+            from pypdf import PdfReader
+
+            reader = PdfReader(str(p))
+            total = len(reader.pages)
+            start = (req.page_start or 1) - 1
+            end = min(req.page_end or total, total)
+            pages = [reader.pages[i].extract_text() or "" for i in range(start, end)]
+            return f"[PDF: {p.name} | 페이지 {start + 1}~{end} / 전체 {total}]\n\n" + "\n\n".join(
+                pages
+            )
+
+        elif ext in (".xlsx", ".xls"):
+            import openpyxl
+
+            wb = openpyxl.load_workbook(str(p), read_only=True, data_only=True)
+            target_sheets = [req.sheet] if req.sheet else wb.sheetnames
+            parts = []
+            for name in target_sheets:
+                if name not in wb.sheetnames:
+                    parts.append(f"시트 없음: {name}")
+                    continue
+                ws = wb[name]
+                row_start = req.row_start or 1
+                row_end = req.row_end or ws.max_row or 0
+                rows = []
+                for i, row in enumerate(
+                    ws.iter_rows(min_row=row_start, max_row=row_end), start=row_start
+                ):
+                    if any(cell.value is not None for cell in row):
+                        rows.append(
+                            [str(cell.value) if cell.value is not None else "" for cell in row]
+                        )
+                total_rows = ws.max_row or 0
+                header = f"[시트: {name} | 행 {row_start}~{min(row_end, total_rows)} / 전체 {total_rows}행]"
+                parts.append(
+                    header + "\n\n" + (_rows_to_markdown(rows) if rows else "(데이터 없음)")
+                )
+            wb.close()
+            return "\n\n".join(parts)
+
+        elif ext == ".pptx":
+            from pptx import Presentation
+
+            prs = Presentation(str(p))
+            total = len(prs.slides)
+            start = (req.page_start or 1) - 1
+            end = min(req.page_end or total, total)
+            parts = []
+            for i in range(start, end):
+                slide = prs.slides[i]
+                texts = [
+                    shape.text_frame.text.strip()
+                    for shape in slide.shapes
+                    if shape.has_text_frame and shape.text_frame.text.strip()
+                ]
+                if texts:
+                    parts.append(f"[슬라이드 {i + 1}]\n" + "\n".join(texts))
+            return (
+                f"[PPTX: {p.name} | 슬라이드 {start + 1}~{end} / 전체 {total}]\n\n"
+                + "\n\n".join(parts)
+            )
+
+        elif ext == ".docx":
+            from docx import Document
+
+            doc = Document(str(p))
+            parts = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    parts.append(para.text)
+            for table in doc.tables:
+                rows = [[cell.text.replace("\n", " ") for cell in row.cells] for row in table.rows]
+                md = _rows_to_markdown(rows)
+                if md:
+                    parts.append(md)
+            return f"[DOCX: {p.name}]\n\n" + "\n\n".join(parts)
+
+        elif ext in (".txt", ".md", ".csv", ".log"):
+            return p.read_text(encoding="utf-8", errors="replace")
+
+        else:
+            return f"지원하지 않는 파일 형식입니다: {ext}"
+
+    try:
+        text = await asyncio.to_thread(_extract)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"텍스트 추출 실패: {e}")
+
+    return {"text": text, "length": len(text)}
 
 
 @app.get("/windows", dependencies=[Auth])

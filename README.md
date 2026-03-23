@@ -198,6 +198,7 @@ Docker 컨테이너 안의 가상 화면을 제어합니다. `WINDOWS_AGENT_URL`
 활성화 시 추가되는 도구:
 
 - `windows_shell` — PowerShell 명령 실행 (디스크 용량, 프로세스, 서비스 관리 등)
+- `windows_file` — PDF, Excel, DOCX, PPTX 파일 읽기 (대용량 청크 처리 지원)
 - `browser` — Playwright DOM 기반 브라우저 자동화
 - `computer_use` — 화면 캡처, 마우스/키보드 제어 (명시적 요청 시)
 
@@ -296,6 +297,7 @@ koclaw가 보낸 메시지에 `:x:` (Slack) 또는 `❌` (Discord) 이모지를 
 | `calendar` | iCloud 캘린더 일정 조회·추가·수정·삭제 — CalDAV 기반 (`CALDAV_URL` / `CALDAV_USERNAME` / `CALDAV_PASSWORD` 필요) |
 | `send_email` | Gmail SMTP로 이메일 전송 (`GMAIL_USER` / `GMAIL_APP_PASSWORD` 필요) |
 | `windows_shell` | Windows PowerShell 명령 실행 — 디스크 용량, 프로세스, 서비스 관리 등 (Windows Agent 필요) |
+| `windows_file` | Windows 파일 읽기 — PDF, Excel, DOCX, PPTX 텍스트 추출, 대용량 청크 처리 지원 (Windows Agent 필요) |
 | `computer_use` | 데스크탑 제어 — 브라우저 열기, 클릭, 입력, 스크린샷 (Docker 또는 Windows Agent) |
 | `delegate` | 서브 에이전트에게 하위 태스크 위임 / 병렬 처리 (멀티 에이전트) |
 | 파일 분석 | PDF, DOCX, HWP, HWPX, Excel(.xlsx), PPTX, 이미지 자동 파싱 (첨부 시 자동) |
@@ -376,7 +378,8 @@ koclaw/
 │   ├── file.py            # 파일 읽기/목록
 │   ├── delegate.py        # 멀티 에이전트 (서브 에이전트 위임)
 │   ├── computer_use.py    # 가상 데스크탑 제어
-│   └── windows_shell.py   # Windows PowerShell 명령 실행
+│   ├── windows_shell.py   # Windows PowerShell 명령 실행
+│   └── windows_file.py    # Windows 파일 읽기 (PDF/Excel/DOCX/PPTX)
 ├── channels/
 │   ├── slack.py           # Slack 채널 핸들러
 │   ├── discord.py         # Discord 채널 핸들러

@@ -16,6 +16,7 @@
 | 프롬프트 인젝션 방어 | `koclaw/core/prompt_guard.py` |
 | 가상 데스크탑 매니저 | `koclaw/core/computer_use_manager.py` |
 | Windows PowerShell 실행 tool | `koclaw/tools/windows_shell.py` |
+| Windows 파일 읽기 tool | `koclaw/tools/windows_file.py` |
 | 채널 라우팅 | `koclaw/channels/__init__.py` |
 | 에이전트 팩토리 | `koclaw/app.py` |
 | Slack 채널 핸들러 | `koclaw/channels/slack.py` |

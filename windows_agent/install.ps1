@@ -116,7 +116,11 @@ $packages = @(
     "pyperclip>=1.8.2",
     "pillow>=10.0.0",
     "pydantic>=2.0.0",
-    "playwright>=1.40.0"
+    "playwright>=1.40.0",
+    "pypdf>=4.0.0",
+    "openpyxl>=3.1.0",
+    "python-docx>=1.1.0",
+    "python-pptx>=0.6.23"
 )
 
 foreach ($pkg in $packages) {

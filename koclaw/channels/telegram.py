@@ -27,6 +27,8 @@ HELP_TEXT = """\
 • <b>Windows PowerShell 실행</b> — Windows PC에서 PowerShell 명령 실행 (Windows Agent 필요)
   - <code>C 드라이브 용량 얼마나 남았어?</code>
   - <code>실행 중인 프로세스 상위 10개 보여줘</code>
+• <b>Windows 파일 읽기</b> — PDF, Excel, DOCX, PPTX 내용 분석, 대용량도 청크로 처리 (Windows Agent 필요)
+  - <code>C:\Users\사용자\Downloads\report.xlsx 내용 요약해줘</code>
 • <b>브라우저 자동화</b> — Playwright DOM 기반 웹 제어 (Windows Agent 필요)
 • <b>가상 데스크탑 제어</b> — 브라우저 열기, 클릭, 입력, 스크린샷 등 GUI 자동화 (Docker 필요)
 • <b>웹훅</b> — 외부 서비스(GitHub, CI/CD 등) 이벤트를 DM/채널로 수신
@@ -63,6 +65,7 @@ _TOOL_ICONS: dict[str, str] = {
     "computer_use": "🖥️",
     "browser": "🧭",
     "windows_shell": "💻",
+    "windows_file": "📂",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",

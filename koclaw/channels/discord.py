@@ -26,6 +26,9 @@ HELP_TEXT = """\
   - `C 드라이브 용량 얼마나 남았어?`
   - `실행 중인 프로세스 상위 10개 보여줘`
   - `Windows 서비스 목록 확인해줘`
+• **Windows 파일 읽기** — PDF, Excel, DOCX, PPTX 내용 분석, 대용량도 청크로 처리 (Windows Agent 필요)
+  - `C:\Users\사용자\Downloads\report.xlsx 내용 요약해줘`
+  - `C:\Users\사용자\Desktop\계약서.pdf 3~10페이지 읽어줘`
 • **브라우저 자동화** — Playwright DOM 기반 웹 제어 (좌표 없이 selector로 클릭·입력) (Windows Agent 필요)
   - `네이버 열고 로그인 버튼 눌러줘` — text selector 자동 탐지
   - `이 페이지에서 검색창에 "AI" 입력하고 검색해줘`
@@ -86,6 +89,7 @@ _TOOL_ICONS: dict[str, str] = {
     "computer_use": "🖥️",
     "browser": "🧭",
     "windows_shell": "💻",
+    "windows_file": "📂",
     "memory": "🧠",
     "send_email": "📧",
     "scheduler": "📅",

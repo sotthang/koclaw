@@ -105,31 +105,6 @@ class CalendarTool(Tool):
             caldav_password,
         )
 
-    def _make_session(self):  # -> requests.Session
-        """HTTP/3(QUIC) 비활성화 requests 세션 — iCloud Alt-Svc EMSGSIZE 오류 방지."""
-        import requests
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-
-        class _NoQuicAdapter(HTTPAdapter):
-            def init_poolmanager(
-                self, num_pools: int, maxsize: int, block: bool = False, **kwargs: object
-            ) -> None:
-                try:
-                    from urllib3 import HttpVersion  # urllib3-future에서만 존재
-
-                    kwargs.setdefault("disabled_svn", {HttpVersion.h3})
-                except ImportError:
-                    pass
-                super().init_poolmanager(num_pools, maxsize, block=block, **kwargs)
-
-        retry = Retry(total=3, backoff_factor=0.5, allowed_methods=None)
-        adapter = _NoQuicAdapter(max_retries=retry)
-        session = requests.Session()
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
-        return session
-
     def _execute_sync(
         self,
         action: str,
@@ -147,10 +122,10 @@ class CalendarTool(Tool):
         import caldav
 
         try:
-            session = self._make_session()
-            client = caldav.DAVClient(
-                url=url, username=username, password=password, session=session
-            )
+            client = caldav.DAVClient(url=url, username=username, password=password)
+            # niquests 세션의 HTTP/3(QUIC) 비활성화 — iCloud Alt-Svc EMSGSIZE 오류 방지
+            if hasattr(client.session, "_disable_http3"):
+                client.session._disable_http3 = True
             principal = client.principal()
             all_calendars = principal.calendars()
         except Exception as e:

@@ -122,10 +122,12 @@ class CalendarTool(Tool):
         import caldav
 
         try:
+            import niquests
+
             client = caldav.DAVClient(url=url, username=username, password=password)
-            # niquests 세션의 HTTP/3(QUIC) 비활성화 — iCloud Alt-Svc EMSGSIZE 오류 방지
-            if hasattr(client.session, "_disable_http3"):
-                client.session._disable_http3 = True
+            # HTTP/3(QUIC) 비활성화 세션으로 교체 — iCloud Alt-Svc EMSGSIZE 오류 방지
+            # auth는 session이 아닌 client 객체에 저장되므로 session만 교체해도 안전함
+            client.session = niquests.Session(disable_http3=True)
             principal = client.principal()
             all_calendars = principal.calendars()
         except Exception as e:
